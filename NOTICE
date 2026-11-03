@@ -1,0 +1,9 @@
+VibeWorks
+Copyright 2026 Farzin Nasiri and VibeWorks contributors
+
+Original VibeWorks source code and documentation are licensed under the
+Apache License, Version 2.0. See LICENSE.
+
+Third-party dependencies, fonts and rendering assets retain their own
+copyrights and licenses. Their notices are in src/web/third-party-notices.txt
+and the license files accompanying those assets.

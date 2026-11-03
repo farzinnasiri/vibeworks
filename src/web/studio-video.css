@@ -1,0 +1,72 @@
+/* The sequence occupies the picture's foot. Its measured height reserves the camera above it. */
+.studio-video-panel.studio-video-editor { padding: 10px 16px; max-height: min(56%, 430px); overflow: auto; }
+.studio-video-editor .studio-video-toolbar { min-height: 34px; gap: 16px; }
+.studio-video-heading { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.studio-video-heading strong { font-size: 12px; font-weight: 600; white-space: nowrap; }
+.studio-video-heading > span { font-size: 11px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.studio-video-editor .studio-video-toolbar-actions { display: flex; flex: none; align-items: center; gap: 6px; }
+.studio-video-editor .studio-video-toolbar-actions .ghost-button { gap: 5px; }
+.studio-video-editor .studio-video-shots { margin: 8px 0; gap: 8px; padding: 2px; }
+.studio-video-editor .studio-video-shots li { flex: 0 0 138px; }
+.studio-video-editor .studio-video-shots button { display: block; overflow: hidden; border-radius: 7px; padding: 0; background: var(--paper); }
+.studio-video-editor .studio-video-shots button.active { border-color: var(--signal); background: var(--signal-soft); }
+.studio-video-editor .studio-video-shots .studio-video-shot-picture { display: block; position: relative; width: 100%; height: 68px; background: var(--sunken); }
+.studio-video-shot-picture img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.studio-video-shot-loading { display: flex; align-items: center; justify-content: center; height: 100%; padding: 8px; text-align: center; color: var(--ink-2); font: 10px var(--sans); }
+.studio-video-shot-index { position: absolute; top: 4px; left: 4px; padding: 2px 4px; border-radius: 3px; background: var(--surface-solid); color: var(--ink); font: 10px var(--mono); }
+.studio-video-editor .studio-video-shots .studio-video-shot-caption { display: grid; gap: 1px; padding: 5px 7px; font-family: inherit; color: var(--ink); }
+.studio-video-editor .studio-video-shots strong { font-size: 11px; line-height: 15px; }
+.studio-video-editor .studio-video-shots small { font-size: 10px; line-height: 14px; }
+.studio-video-transport { display: flex; align-items: center; gap: 8px; min-height: 34px; }
+.studio-video-transport > input { flex: 1; min-width: 32px; accent-color: var(--ink); height: 28px; }
+.studio-video-transport > output { flex: none; min-width: 72px; text-align: right; color: var(--ink-2); font-size: 11px; font-variant-numeric: tabular-nums; }
+.studio-video-editor .studio-video-output { margin-top: 6px; min-height: 34px; gap: 8px; }
+.studio-video-export-summary { display: inline-flex; align-items: center; gap: 6px; padding: 4px 0; border: 0; background: transparent; color: var(--ink-2); font: inherit; font-size: 11px; text-align: left; margin-right: auto; }
+.studio-video-export-summary:hover, .studio-video-export-summary[aria-expanded="true"] { color: var(--ink); }
+.studio-video-presets { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0; }
+.studio-video-presets > button { display: flex; align-items: center; gap: 8px; flex: 1 1 130px; min-height: 56px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); background: var(--paper); text-align: left; }
+.studio-video-presets > button:hover:not(:disabled) { border-color: var(--line-strong); background: var(--sunken); }
+.studio-video-presets > button > span { display: grid; gap: 3px; }
+.studio-video-presets strong { font-size: 11px; font-weight: 600; }
+.studio-video-presets small, .studio-video-presets p { color: var(--ink-2); font-size: 10px; }
+.studio-video-presets p { width: 100%; margin: 0; }
+.studio-video-editor .studio-video-details { border-top: 1px solid var(--line); margin: 8px 0; padding-top: 8px; }
+.studio-video-editor .studio-video-details fieldset { display: block; margin: 0; }
+.studio-video-edit-fields { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+.studio-video-editor .studio-video-edit-fields > label { flex: 0 1 80px; }
+.studio-video-editor .studio-video-edit-fields > label:first-child { flex: 1 1 120px; }
+.studio-video-editor .studio-video-edit-fields input { height: 32px; }
+.studio-video-motion { display: grid; gap: 6px; color: var(--ink-2); font-size: 11px; }
+.studio-video-motion > div { display: flex; gap: 3px; }
+.studio-video-editor button[aria-pressed="true"].ghost-button { background: var(--ink); color: var(--on-ink); border-color: transparent; }
+.studio-video-editor .studio-video-edit-actions { gap: 6px; margin-top: 8px; align-items: center; }
+.studio-video-edit-divider { width: 1px; height: 20px; margin: 0 3px; background: var(--line); }
+.studio-video-advanced { margin-top: 8px; }
+.studio-video-advanced > summary { font-size: 11px; color: var(--ink-2); }
+.studio-video-editor .studio-video-advanced label { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.studio-video-editor .studio-video-advanced input { max-width: 120px; }
+.studio-video-export-settings { display: flex; flex-wrap: wrap; gap: 10px 20px; padding: 10px 0; margin: 8px 0 0; border: 0; border-top: 1px solid var(--line); }
+.studio-video-export-settings > div { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--ink-2); }
+.studio-video-export-settings > div > div { display: flex; gap: 4px; }
+.studio-video-export-settings > p { margin: 0; flex-basis: 100%; font-size: 11px; color: var(--ink-2); line-height: 1.5; }
+.studio-video-viewer:modal { position: fixed; inset: 24px; width: auto; height: auto; max-width: none; max-height: none; margin: 0; border: 1px solid var(--line); color: var(--ink); }
+.studio-video-viewer::backdrop { background: #0008; }
+@media (max-width: 700px), (pointer: coarse) {
+  .studio-video-panel.studio-video-editor { padding: 8px 12px; max-height: 52%; }
+  .studio-video-editor .studio-video-toolbar { gap: 8px; align-items: center; }
+  .studio-video-heading { flex-wrap: wrap; gap: 2px 8px; flex: 1; }
+  .studio-video-heading > span { font-size: 10px; }
+  .studio-video-editor .studio-video-toolbar-actions { gap: 4px; }
+  .studio-video-editor .studio-video-shots li { flex-basis: 126px; }
+  .studio-video-transport { flex-wrap: wrap; gap: 4px; }
+  .studio-video-transport > output { min-width: 68px; }
+  .studio-video-transport > input { height: 44px; }
+  .studio-video-editor .studio-video-output { gap: 6px; }
+  .studio-video-editor .studio-video-output .primary-button { flex: none; }
+  .studio-video-export-summary { min-height: 44px; flex: 1; font-size: 10px; }
+  .studio-video-export-summary > span { max-width: 150px; }
+  .studio-video-editor .studio-video-edit-fields input { height: 44px; }
+  .studio-video-editor .studio-video-edit-actions { gap: 5px; }
+  .studio-video-presets > button { flex-basis: 140px; }
+  .studio-video-viewer:modal { inset: 8px; }
+}

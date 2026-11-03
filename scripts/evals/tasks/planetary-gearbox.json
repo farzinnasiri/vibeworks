@@ -1,0 +1,48 @@
+{
+  "id": "planetary-gearbox",
+  "prompt": "Build a detailed planetary gearbox concept with a sun gear, three planets, ring gear, carrier, shafts, housing and cover. Choose and state a coherent scale and tooth-count relationship; use named parameters for the gear layout and repeated dimensions. Give parts materials as you create them. Model each physical part as a solid, keep moving parts separate, and declare intentional assembly clearances. Validate attachment and interference, then inspect issues, material and section views. Save the editable model and export STEP. Report approximated teeth or any unverified motion honestly. Use only the cad tools; do not read repository docs or operate the browser. Open the final document for review.",
+  "requiresFeatureKinds": [],
+  "expectations": [
+    {
+      "path": "health.analysis",
+      "equals": "current"
+    },
+    {
+      "path": "health.ok",
+      "equals": true
+    },
+    {
+      "path": "counts.invalidResults",
+      "equals": 0
+    },
+    {
+      "path": "counts.features",
+      "min": 1
+    },
+    {
+      "path": "health.partsWithoutAppearance",
+      "equals": 0
+    },
+    {
+      "path": "parameters.used",
+      "min": 3
+    },
+    {
+      "path": "parameters.bindings",
+      "min": 6
+    },
+    {
+      "path": "counts.results",
+      "min": 6
+    },
+    {
+      "path": "modeling.checks",
+      "min": 3
+    }
+  ],
+  "humanReview": [
+    "Verify sun + 2*planet tooth count equals ring tooth count and layout is coherent.",
+    "Check that three planets, carrier, housing and shafts are present and physically plausible.",
+    "Inspect motion/meshing separately: valid solids and pairwise clearance do not prove a working gearbox."
+  ]
+}

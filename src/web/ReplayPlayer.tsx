@@ -1,0 +1,21 @@
+import {Icon} from './icons';
+import type {Playback,PlaybackState,PlaybackMode} from './playback';
+export function ReplayPlayer({controller,state,onMode}:{controller:Playback;state:PlaybackState;onMode:(mode:PlaybackMode)=>void}){
+ const current=state.replay?.steps[(state.displayed||1)-1];
+ const path=state.mode==='changes'&&state.operation?.action==='delete'&&state.operation.documentId===state.scope?.documentId?'Before deletion':state.mode==='changes'?state.operation?.intent?.purpose??(state.operation?`${state.operation.action??state.operation.operation.replaceAll('_',' ')}${state.operation.featureIds.length?' · '+state.operation.featureIds.slice(0,3).join(', '):''}`:'Recorded change'):state.detail==='components'?current?.path.map(p=>p.label).join(' / '):state.document?.features[(state.displayed||1)-1]?.label??state.document?.features[(state.displayed||1)-1]?.id;
+ return <section className="replay-player" aria-label="Replay" onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();controller.close();}}}>
+  <header><strong>Replay</strong><button type="button" className="icon-button" aria-label="Close replay" title="Close replay · Esc" onClick={controller.close}><Icon name="close" size={16}/></button></header>
+  <div className="replay-modes" role="tablist" aria-label="Replay mode">{(['construction','changes']as const).map(mode=><button type="button" role="tab" key={mode} aria-selected={state.mode===mode} onClick={()=>onMode(mode)}>{mode==='construction'?'Construction':'Changes'}</button>)}</div>
+  <p className="replay-scope">{state.scope?.name}{state.snapshot&&<small> · r{state.snapshot.revision}</small>}{state.scope?.agentId&&<span> · {state.scope.author??'Selected agent'}</span>}</p>
+  {state.mode==='construction'&&state.document?.features.some(f=>f.kind==='instance')&&<div className="replay-detail" role="group" aria-label="Construction detail"><button type="button" aria-pressed={state.detail==='assembly'} onClick={()=>controller.setConstructionDetail('assembly')}>Assembly steps</button><button type="button" aria-pressed={state.detail==='components'} onClick={()=>controller.setConstructionDetail('components')}>Inside components</button></div>}
+  <div className="replay-transport">
+   <button type="button" className="icon-button" aria-label={state.playing?'Pause replay':'Play replay'} disabled={state.preparing||(state.mode==='changes'&&!state.total)||(state.mode==='construction'&&state.document?.features.length===0)} onClick={controller.toggle}><Icon name={state.playing?'pause':'play'} size={16}/></button>
+   <input type="range" aria-label="Replay position" aria-valuetext={`Requested ${state.requested}; showing ${state.displayed} of ${state.total}`} min={1} max={Math.max(1,state.total)} value={state.requested} disabled={state.preparing||!state.total} onChange={event=>{controller.pause();controller.seek(Number(event.target.value));}}/>
+   <span className="replay-count">{state.requested}<small>/{state.total||'…'}</small></span>
+  </div>
+  <div className="replay-options"><button type="button" className="ghost-button small" aria-label={`Target replay speed ${state.speed}×`} onClick={()=>controller.setSpeed(state.speed===16?1:state.speed*2)}>{state.speed}×</button><span>Target pace</span><button type="button" className="icon-button" aria-label="Next replay step" disabled={!state.total||state.requested>=state.total} onClick={()=>{controller.pause();controller.seek(state.requested+1);}}><Icon name="latest" size={15}/></button></div>
+  <p className="replay-description" title={path}>{path??(state.mode==='construction'?'Feature order in one saved state':'Saved changes in commit order')}</p>
+  <p className="replay-status" role="status">{state.preparing?'Loading recorded timeline…':state.error?'Playback paused':state.loading?`Preparing ${state.requested} · showing ${state.displayed||'current design'}`:state.displayed?`${state.playing?'Playing':'Showing'} ${state.displayed} of ${state.total}`:'Press Play to start'}</p>
+  {state.error&&<div className="replay-error" role="alert"><p>{state.error}</p><button type="button" className="ghost-button small" onClick={controller.retry}>Retry frame</button></div>}
+ </section>;
+}

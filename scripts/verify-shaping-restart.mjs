@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {readFile,writeFile,appendFile} from 'node:fs/promises';
+import {join} from 'node:path';
+const state=process.argv[2],mode=process.argv[3],out=new URL('../artifacts/foundations/d/',import.meta.url);assert.ok(['before','after'].includes(mode));
+const marker=JSON.parse(await readFile(join(state,'foundations-stack.json'),'utf8'));assert.equal(marker.owner,'vibeworks-foundations-2026-11-02');const c=JSON.parse(await readFile(join(state,'connection.json'),'utf8')),f=JSON.parse(await readFile(new URL('commands.json',out),'utf8'));let sessionId;
+async function call(type,params){const start=performance.now(),body=JSON.stringify({requestId:crypto.randomUUID(),sessionId,command:{type,params}}),response=await fetch(c.httpUrl+'/command',{method:'POST',headers:{Authorization:`Bearer ${c.token}`,'Content-Type':'application/json','X-Vibeworks-Fingerprint':c.fingerprint},body}),text=await response.text(),r=JSON.parse(text);await appendFile(new URL('restart-calls.jsonl',out),JSON.stringify({at:new Date().toISOString(),type,params,status:r.status,error:r.error?.code,argumentBytes:Buffer.byteLength(body),resultBytes:Buffer.byteLength(text),durationMs:performance.now()-start})+'\n');assert.equal(r.status,'success',JSON.stringify(r.error));return r;}
+sessionId=(await call('agent_session',{action:'join',client:'D-'+mode+'-restart-fixture',task:'Verify persisted shaping settings and exact metrics'})).session.sessionId;
+const facts=[];
+for(const d of f.documents){const r=await call('inspect_model',{documentId:d.documentId,detail:'full'});facts.push({documentId:d.documentId,features:r.document.features,revision:r.revision,geometry:r.geometry});}
+let jobId=mode==='after'?JSON.parse(await readFile(new URL('restart-before.json',out),'utf8')).jobId:f.analysisJob.id;if(mode==='before'){const target=f.documents.find(d=>d.kinds.includes('fill')&&!d.kinds.includes('join'));jobId=(await call('analyze_model',{documentId:target.documentId,action:'run',waitMs:20000})).analysisJob.id;}
+const job=await call('analyze_model',{jobId,action:'result'});assert.equal(job.analysisJob.state,'complete');assert.equal(job.analysis.parts,1);
+if(mode==='before')await writeFile(new URL('restart-before.json',out),JSON.stringify({facts,jobId:job.analysisJob.id,parts:job.analysis.parts},null,2));
+else{const prior=JSON.parse(await readFile(new URL('restart-before.json',out),'utf8'));assert.deepEqual(facts,prior.facts);assert.equal(job.analysisJob.id,prior.jobId);await writeFile(new URL('restart-results.json',out),JSON.stringify({status:'passed',documents:facts.length,exactDefinitionsAndMetricsEqual:true,persistedAnalysisParts:job.analysis.parts,analysisCurrent:job.analysisJob.current,constructionSheets:job.health.constructionSheets,healthOk:job.health.ok,jobId:job.analysisJob.id},null,2));}
+console.log(JSON.stringify({status:'passed',mode,documents:facts.length}));

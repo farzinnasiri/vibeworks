@@ -1,0 +1,9 @@
+{
+  "provider": "codex",
+  "agentCommand": ["codex", "exec", "--skip-git-repo-check", "--json", "{mcpArgs}", "{prompt}"],
+  "browserOpen": ["agent-browser", "--session", "{session}", "open", "{url}"],
+  "browserClose": ["agent-browser", "--session", "{session}", "close"],
+  "bridgePort": 24318,
+  "webPort": 25173,
+  "agentTimeoutSeconds": 1200
+}

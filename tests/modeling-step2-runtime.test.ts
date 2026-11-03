@@ -1,0 +1,71 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import initOpenCascade from 'replicad-opencascadejs';
+import { setOC } from 'replicad';
+import { GeometryEngine } from '../src/cad/geometry';
+import { GeometryWorker } from '../src/cad/worker-client';
+import { CadRuntime } from '../src/cad/runtime';
+import { SqliteStore } from '../src/bridge/sqlite-store';
+import { context } from '../src/cad/demo';
+import { bodySections, xyFrame } from '../src/cad/modeling-presets';
+import { resultSchema } from '../src/bridge/validation';
+import type { CadDocument, Feature } from '../src/shared/protocol';
+
+const kernel=readFile(new URL('../node_modules/replicad-opencascadejs/dist/replicad_single.wasm',import.meta.url)).then(wasmBinary=>initOpenCascade({wasmBinary,print:()=>{},printErr:()=>{}}));
+const close=(a:number,b:number)=>assert.ok(Math.abs(a-b)<1e-5,`${a} != ${b}`);
+
+test('new geometry and attachments preserve atomic state and durable undo/reload; nested mount refresh is source-CAS aware',async t=>{
+  const dir=await mkdtemp(join(tmpdir(),'vibeworks-step2-runtime-')), store=new SqliteStore(join(dir,'workspace.db'));
+  const oc=await kernel;setOC(oc);const engine=new GeometryEngine(oc);
+  t.after(()=>{engine.dispose();store.close();return rm(dir,{recursive:true,force:true});});
+  t.mock.method(GeometryWorker.prototype,'initialize',async(d:CadDocument,refs:CadDocument[]=[])=>engine.evaluate(d,refs));
+  t.mock.method(GeometryWorker.prototype,'evaluate',async(d:CadDocument,_timeout?:number,analyze?:{featureIds?:string[]},refs:CadDocument[]=[])=>{
+    const ev=engine.evaluate(d,refs);return analyze?{...ev,analysis:engine.analyze(d,ev.geometry,analyze.featureIds)}:ev;
+  });
+  let runtime=new CadRuntime(store);await runtime.initialize();
+  const source=runtime.getSnapshot().document;
+  const loft:Feature={id:'body',kind:'loft',params:{sections:bodySections(),ruled:false},mounts:[{name:'wing',frame:xyFrame([20,0,15])}]};
+  let result=await runtime.execute({type:'apply_edits',params:{...context(source),edits:[{op:'add',feature:loft}]}});assert.equal(result.status,'success');resultSchema.parse(result);
+  const sourceId=source.documentId, sourceVolume=result.geometry![0].volumeMm3;
+  const created=await runtime.execute({type:'documents',params:{action:'create',name:'Mounted body',kind:'assembly'}});const id=created.documentId!;
+  const attached:Extract<Feature,{kind:'instance'}>={id:'part',kind:'instance',params:{document:sourceId,translation:[0,0,0],rotationAxis:[0,0,1],origin:[0,0,0],angleDegrees:0,attachment:{source:{featureId:'body',name:'wing'},target:{frame:xyFrame([100,0,15])},mode:'align',offset:[0,0,0],twistDegrees:0}}};
+  result=await runtime.execute({type:'apply_edits',params:{documentId:id,expectedRevision:0,edits:[{op:'add',feature:attached}]}});assert.equal(result.status,'success');resultSchema.parse(result);close(result.geometry![0].bounds.min[0],20);
+  await runtime.openDocument(id);
+  const old=runtime.getSnapshot(), stored=await store.read(id), feed=await store.operation({action:'changes',after:0});
+  const moved=structuredClone(attached);moved.params.attachment!.offset[2]=10;
+  result=await runtime.execute({type:'apply_edits',params:{...context(old.document),dryRun:true,edits:[{op:'update',feature:moved}]}});assert.equal(result.status,'success');close(result.geometry![0].bounds.min[2],old.evaluation.geometry[0].bounds.min[2]+10);
+  assert.deepEqual(runtime.getSnapshot().document,old.document);assert.deepEqual(await store.read(id),stored);assert.deepEqual(await store.operation({action:'changes',after:0}),feed);
+  const bad=structuredClone(moved);bad.params.attachment!.source.name='deleted';
+  result=await runtime.execute({type:'apply_edits',params:{...context(old.document),edits:[{op:'update',feature:bad}]}});assert.equal(result.error?.code,'MOUNT_NOT_FOUND');
+  assert.equal(runtime.getSnapshot().evaluation,old.evaluation);assert.deepEqual(await store.read(id),stored);assert.equal(runtime.getSnapshot().canUndo,old.canUndo);
+  result=await runtime.execute({type:'apply_edits',params:{...context(old.document),edits:[{op:'update',feature:moved}]}});assert.equal(result.status,'success');
+  runtime=new CadRuntime(store);await runtime.initialize();await runtime.openDocument(id);
+  assert.equal(runtime.getSnapshot().document.features[0].kind,'instance');close(runtime.getSnapshot().evaluation.geometry[0].bounds.min[2],old.evaluation.geometry[0].bounds.min[2]+10);
+  result=await runtime.execute({type:'document_action',params:{...context(runtime.getSnapshot().document),action:'undo'}});assert.equal(result.status,'success');close(result.geometry![0].bounds.min[2],old.evaluation.geometry[0].bounds.min[2]);
+  runtime=new CadRuntime(store);await runtime.initialize();await runtime.openDocument(id);assert.equal(runtime.getSnapshot().canRedo,true);
+  result=await runtime.execute({type:'document_action',params:{...context(runtime.getSnapshot().document),action:'redo'}});assert.equal(result.status,'success');close(result.geometry![0].bounds.min[2],old.evaluation.geometry[0].bounds.min[2]+10);
+  // A nested assembly resolves the inherited qualified mount, including after a source-only metadata edit.
+  const top=await runtime.execute({type:'documents',params:{action:'create',name:'Top',kind:'assembly'}});const topId=top.documentId!;
+  const nested=structuredClone(attached);nested.params.document=id;nested.params.attachment!.source={featureId:'part',name:'body/wing'};
+  result=await runtime.execute({type:'apply_edits',params:{documentId:topId,expectedRevision:0,edits:[{op:'add',feature:nested}]}});assert.equal(result.status,'success');await runtime.openDocument(topId);
+  const assemblyVersion=(await store.read(topId))!.version;
+  const changed=structuredClone(loft);changed.mounts![0].frame.origin[0]+=10;
+  result=await runtime.execute({type:'apply_edits',params:{documentId:sourceId,expectedRevision:1,edits:[{op:'update',feature:changed}]}});assert.equal(result.status,'success');
+  close(result.geometry![0].volumeMm3,sourceVolume);assert.deepEqual(result.evaluationStats!.cache.rebuilt,[]);
+  result=await runtime.execute({type:'inspect_model',params:{documentId:topId}});assert.equal(result.status,'success');assert.ok(result.geometry![0].mounts!.some(m=>m.name==='part/body/wing'));assert.equal((await store.read(topId))!.version,assemblyVersion);
+  const removed=structuredClone(changed);removed.mounts=[];
+  result=await runtime.execute({type:'apply_edits',params:{documentId:sourceId,expectedRevision:2,edits:[{op:'update',feature:removed}]}});assert.equal(result.status,'success');
+  result=await runtime.execute({type:'inspect_model',params:{documentId:topId}});assert.match(result.health!.referenceError!,/Mount 'wing' is missing/);
+  result=await runtime.execute({type:'export_model',params:{documentId:topId,format:'step'}});assert.equal(result.error?.code,'ASSEMBLY_STALE');
+  result=await runtime.execute({type:'document_action',params:{documentId:sourceId,expectedRevision:3,action:'undo'}});assert.equal(result.status,'success');
+  result=await runtime.execute({type:'inspect_model',params:{documentId:topId}});assert.equal(result.health?.referenceError,undefined);
+  // New metadata participates in source-version CAS even when it did not rebuild the source solid.
+  const before=await store.read(id), version=(await store.read(sourceId))!.version;
+  const changedAgain=structuredClone(changed);changedAgain.mounts![0].frame.origin[1]+=1;
+  await store.operation({action:'write',document:{...(await store.read(sourceId))!.document,features:[changedAgain]},expectedVersion:version,history:{undo:[],redo:[]}});
+  await assert.rejects(store.operation({action:'write',document:before!.document,expectedVersion:before!.version,references:{[sourceId]:version},history:before!.history}),{code:'STORAGE_CONFLICT'});
+  assert.deepEqual(await store.read(id),before);
+});

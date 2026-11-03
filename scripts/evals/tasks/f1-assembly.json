@@ -1,0 +1,51 @@
+{
+  "id": "f1-assembly",
+  "prompt": "Build a detailed Ferrari-style Formula 1 concept car as an assembly of reusable part documents. Include chassis/monocoque, floor, front and rear wings, sidepods, cockpit/halo, suspension and four wheels with tires, rims and brakes. Plan the subsystems, then build parts and place instances in the assembly. Use parameters for wheelbase, track, ride height and repeated dimensions; set appearance as you go. Fuse the pieces of each physical part. Suspension should reach its mounting points, not stop in mid-air or pierce the cockpit. Use checks to state genuine intended contacts, gaps and overlaps. Add as much useful detail as the task needs, without a component-count target. Finish with whole-document analysis and issues/material renders; save editable documents and export STEP. Report unresolved findings honestly. Use only cad tools, never repository docs or browser operation. Open the final assembly for review.",
+  "requiresFeatureKinds": [
+    "instance"
+  ],
+  "expectations": [
+    {
+      "path": "health.analysis",
+      "equals": "current"
+    },
+    {
+      "path": "health.ok",
+      "equals": true
+    },
+    {
+      "path": "counts.invalidResults",
+      "equals": 0
+    },
+    {
+      "path": "counts.features",
+      "min": 1
+    },
+    {
+      "path": "health.partsWithoutAppearance",
+      "equals": 0
+    },
+    {
+      "path": "counts.byKind.instance",
+      "min": 4
+    },
+    {
+      "path": "parameters.used",
+      "min": 3
+    },
+    {
+      "path": "parameters.bindings",
+      "min": 6
+    },
+    {
+      "path": "modeling.checks",
+      "min": 4
+    }
+  ],
+  "humanReview": [
+    "Check subsystem coverage and proportions; no component-count ceiling is a quality goal.",
+    "Verify suspension endpoints and wheel locations in multiple views.",
+    "Edit one reusable wheel part and confirm each instance follows its latest revision.",
+    "Evaluate part documents as well as the assembly using workspace.json and --document-id."
+  ]
+}

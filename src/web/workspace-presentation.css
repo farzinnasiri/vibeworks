@@ -1,0 +1,14 @@
+.workspace-presentation{position:absolute;inset:0;display:flex;flex-direction:column;min-width:0;min-height:0}
+.workspace-presentation>header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 12px;border-bottom:1px solid var(--line);font-size:12px}
+.workspace-presentation>header span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.workspace-presentation>header button{flex-shrink:0;min-height:32px}
+.workspace-presentation>.studio-workspace{position:relative;inset:auto;flex:1;min-height:0;width:100%}
+.prepared-panes{display:grid;flex:1;min-height:0;gap:1px;background:var(--line);grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:minmax(0,1fr)}
+.prepared-panes:has(>.prepared-pane:only-child){grid-template-columns:minmax(0,1fr)}
+.prepared-panes.columns{grid-template-columns:repeat(var(--panes),minmax(0,1fr));grid-auto-flow:column}
+.prepared-panes.rows{grid-template-columns:minmax(0,1fr)}
+.prepared-pane{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--paper)}
+.prepared-pane h3{font-size:11px;margin:0;padding:5px 10px;color:var(--ink-2)}
+.prepared-pane>div{position:relative;flex:1;min-height:0;overflow:hidden}
+.prepared-pane canvas{display:block;touch-action:none}
+@media(max-width:600px){.prepared-panes,.prepared-panes.columns{grid-template-columns:minmax(0,1fr);grid-auto-flow:row}.workspace-presentation>header button{min-height:44px}}

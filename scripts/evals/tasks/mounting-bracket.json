@@ -1,0 +1,67 @@
+{
+  "id": "mounting-bracket",
+  "prompt": "Build a mounting bracket for a small motor. Use an 80 x 50 mm base, 40 mm overall height including the base, 5 mm wall thickness and four 5 mm mounting holes. Make the principal dimensions and hole diameter named, bound parameters so I can resize it. Build one physical bracket with rounded or chamfered exposed edges, aluminum appearance, and through holes. Check exact geometry, review an issues render and a materials render, save the editable document and export STEP. Use only the cad tools; do not read repository docs or operate the browser. Open the final document for review.",
+  "requiresFeatureKinds": [],
+  "expectations": [
+    {
+      "path": "health.analysis",
+      "equals": "current"
+    },
+    {
+      "path": "health.ok",
+      "equals": true
+    },
+    {
+      "path": "counts.invalidResults",
+      "equals": 0
+    },
+    {
+      "path": "counts.features",
+      "min": 1
+    },
+    {
+      "path": "health.partsWithoutAppearance",
+      "equals": 0
+    },
+    {
+      "path": "parameters.defined",
+      "min": 4
+    },
+    {
+      "path": "parameters.used",
+      "min": 4
+    },
+    {
+      "path": "parameters.bindings",
+      "min": 5
+    },
+    {
+      "path": "counts.results",
+      "equals": 1
+    },
+    {
+      "path": "counts.solids",
+      "equals": 1
+    },
+    {
+      "path": "geometry.bounds.size.0",
+      "min": 79.999,
+      "max": 80.001
+    },
+    {
+      "path": "geometry.bounds.size.1",
+      "min": 49.999,
+      "max": 50.001
+    },
+    {
+      "path": "geometry.bounds.size.2",
+      "min": 39.999,
+      "max": 40.001
+    }
+  ],
+  "humanReview": [
+    "Verify base/upright dimensions and all four through-holes visually and against exact geometry.",
+    "Change thickness and hole diameter; confirm the bracket and holes regenerate.",
+    "Inspect exposed edges and STEP in an independent CAD reader."
+  ]
+}

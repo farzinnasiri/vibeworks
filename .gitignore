@@ -1,0 +1,45 @@
+# Dependencies and generated output
+node_modules/
+dist/
+artifacts/
+output/
+coverage/
+test-results/
+playwright-report/
+.playwright-cli/
+*.log
+*.tsbuildinfo
+
+# Local workspaces, credentials and agent registrations
+.cad-local.json
+.env
+.env.*
+!.env.example
+/.codex/
+/.claude/
+/.agents/
+/.mcp.json
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite3
+*.sqlite-journal
+*.sqlite3-shm
+*.sqlite3-wal
+*.sqlite3-journal
+*.pem
+*.key
+
+# Editor and OS state
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.code-workspace
+
+# Social media footage and the capture rig (local only)
+content/

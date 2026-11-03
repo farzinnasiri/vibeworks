@@ -1,0 +1,14 @@
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.hdr binary
+*.tza binary
+*.ttf binary
+*.otf binary
+*.woff2 binary
+*.wasm binary
+*.mp4 binary
+*.zip binary
+public/brand/FONT-LICENSE.txt -text
+src/cad/fonts/IBMPlexSans-OFL.txt -text

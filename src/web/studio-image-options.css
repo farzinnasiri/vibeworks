@@ -1,0 +1,40 @@
+.studio-output-options { min-width: 0; display: grid; gap: 22px; margin: 0; padding: 0; border: 0; }
+.studio-output-choice-group, .studio-product-view-picker { min-width: 0; border: 0; padding: 0; margin: 0; }
+.studio-output-choice-group > legend, .studio-product-view-picker > legend { padding: 0; margin-bottom: 9px; font-size: 12px; font-weight: 600; color: var(--ink); }
+.studio-output-choices { display: flex; gap: 4px; padding: 3px; background: var(--sunken); border-radius: var(--control-radius, 7px); }
+.studio-output-choices > label { position: relative; flex: 1; min-width: 0; min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 8px; border-radius: 5px; color: var(--ink-2); font-size: 12px; cursor: pointer; text-align: center; }
+.studio-output-choices > label.is-selected { background: var(--surface-solid); color: var(--ink); box-shadow: 0 1px 3px #0002; }
+.studio-output-choices input, .studio-product-view-picker input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; margin: 0; cursor: pointer; }
+.studio-output-choices label:has(input:focus-visible), .studio-product-view-picker label:has(input:focus-visible) { outline: 2px solid var(--signal); outline-offset: 2px; }
+.studio-output-choices input:disabled, .studio-product-view-picker input:disabled { cursor: default; }
+.studio-output-options:disabled { opacity: .6; }
+.studio-product-view-picker > legend { width: 100%; }
+.studio-product-view-picker > legend > span { float: right; font-weight: 400; color: var(--ink-2); }
+.studio-product-view-picker > div { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.studio-product-view-picker label { position: relative; display: flex; min-width: 0; min-height: 68px; flex-direction: column; align-items: center; justify-content: center; gap: 5px; border: 1px solid var(--line); border-radius: var(--control-radius, 7px); color: var(--ink-2); font-size: 11px; cursor: pointer; }
+.studio-product-view-picker label.is-selected { border-color: var(--ink); color: var(--ink); background: var(--sunken); }
+.studio-product-view-check { position: absolute; right: 4px; top: 4px; display: none; color: var(--signal-ink); }
+.studio-product-view-picker label.is-selected .studio-product-view-check { display: block; }
+.studio-output-labels { display: flex; gap: 9px; align-items: center; min-height: 36px; font-size: 12px; color: var(--ink); cursor: pointer; }
+.studio-output-labels input { width: 16px; height: 16px; flex: none; margin: 0; }
+.studio-output-options .studio-output-help { margin: -10px 0 0; color: var(--ink-2); font-size: 12px; line-height: 1.5; }
+.studio-product-preview { min-width: 0; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; overflow: auto; background: var(--paper); }
+.studio-product-preview > header { flex: none; display: flex; width: 100%; max-width: 1200px; justify-content: space-between; gap: 12px; align-items: baseline; color: var(--ink); font-size: 13px; }
+.studio-product-preview > header small { color: var(--ink-2); font-size: 12px; }
+.studio-product-preview-images { min-width: 0; min-height: 0; width: 100%; max-width: 1200px; }
+.studio-product-preview.sheet .studio-product-preview-images { display: grid; place-items: center; flex: 0 1 auto; max-height: calc(100% - 30px); }
+.studio-product-preview figure { position: relative; margin: 0; min-width: 0; min-height: 0; }
+.studio-product-preview.sheet figure { width: 100%; height: 100%; }
+.studio-product-preview img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.studio-product-preview.separate { justify-content: flex-start; }
+.studio-product-preview.separate .studio-product-preview-images { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 16px; padding-bottom: 18px; }
+.studio-product-preview.separate figure { width: 100%; }
+.studio-product-preview figcaption { position: absolute; top: calc(100% + 5px); left: 0; color: var(--ink-2); font-size: 12px; }
+.studio-product-preview-message { margin: auto; padding: 32px 16px; color: var(--ink-2); text-align: center; font-size: 13px; line-height: 1.5; }
+@media (pointer: coarse), (max-width: 700px) {
+  .studio-output-choices > label, .studio-output-labels { min-height: 44px; }
+  .studio-product-preview { padding: 12px; }
+  .studio-product-preview > header { font-size: 12px; }
+  .studio-product-preview > header small { font-size: 11px; }
+  .studio-product-preview.separate .studio-product-preview-images { grid-template-columns: minmax(0, 1fr); }
+}

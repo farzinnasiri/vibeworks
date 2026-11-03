@@ -1,0 +1,32 @@
+/* Selected-object tasks. Independent of agent Details and Studio controls. */
+.inspector-card .card-head{padding:16px;grid-template-columns:28px minmax(0,1fr) 28px;gap:10px}
+.inspector-card .card-head .tool-glyph{width:28px;height:28px;background:transparent;color:var(--ink-2)}
+.inspector-card .card-head h2{white-space:normal;overflow-wrap:anywhere;font-size:14px;line-height:1.4}
+.inspector-card .card-head p{margin-top:4px;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.inspector-card .object-identity{margin:8px 0 0;padding:0;border:0;font-size:12px;color:var(--ink-2)}
+.inspector-card .card-body{padding:16px;display:flex;flex-direction:column;gap:16px}
+.inspector-card .source-context{display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:center}
+.source-context>span{font-size:12px;color:var(--ink-2)}.source-context>strong{font-size:12px;font-weight:500;overflow-wrap:anywhere;grid-column:1}.source-context>button{grid-column:2;grid-row:1/3}
+.inspector-tabs{display:flex;gap:4px;flex:none;background:var(--sunken);padding:4px;border-radius:8px}
+.inspector-tabs>button{flex:1;min-width:0;min-height:32px;padding:6px 4px;font:inherit;font-size:12px;border:0;border-radius:5px;background:transparent;color:var(--ink-2);cursor:pointer}
+.inspector-tabs>[aria-selected=true]{background:var(--surface-solid);color:var(--ink);box-shadow:0 1px 3px #0002}
+.inspector-card .appearance{padding:0;margin:0;border:0;display:flex;flex-direction:column;gap:16px}
+.appearance-scope{font-size:12px;color:var(--ink-2);line-height:1.5}
+.inspector-card .appearance-fields{gap:16px}.inspector-card .select-field{margin:0;gap:6px}
+.inspector-card .appearance-advanced,.inspector-card .inspector-measurements>details{padding:0;border:0;margin:0;font-size:12px}
+.appearance-advanced[open]{display:grid;gap:16px}.inspector-measurements{display:grid;gap:12px;min-width:0}
+.inspector-card .metric-grid dd{white-space:normal;overflow-wrap:anywhere}.inspector-card .metric-grid>div{min-width:0}
+.inspector-card .source-options[open]{display:grid;gap:12px}.inspector-card .source-options{margin:0;padding:0;border:0}
+.inspector-card .apply-bar{position:sticky;bottom:0;margin:0 -4px;padding:12px 4px;gap:8px;flex-wrap:wrap;background:var(--surface-solid);border-top:1px solid var(--line)}
+.inspector-card .apply-bar>span{font-size:12px;flex:1 0 100%}
+.topbar>.manual-history-controls{flex:0 0 68px;min-width:68px;padding:0;margin:0;border:0;gap:2px}
+.topbar>.manual-history-controls>.icon-button{flex:none;width:32px;min-width:32px}
+.topbar>.topbar-actions{flex:none}.topbar>.crumbs{flex:1 1 0;width:0}.topbar>.service-monitor,.topbar>.search{flex:none}
+.topbar>.team-summary{display:flex;align-items:center;justify-content:center;flex:0 0 110px;width:110px;min-width:110px;padding:0;gap:6px}.topbar>.team-summary .team-summary-text{display:inline}
+.topbar .health-chip{width:max-content;max-width:220px;flex:none;justify-content:center}.topbar .health-chip>svg{flex:none}.topbar .health-chip>span{min-width:0;overflow:hidden;text-overflow:ellipsis}.topbar .service-trigger{width:100px;justify-content:center}.topbar .studio-launch{width:112px;flex:none;justify-content:center;white-space:nowrap}.topbar .settings-launch{width:88px;justify-content:center}
+@media(max-width:1500px){.topbar>.team-summary{flex-basis:52px;width:52px;min-width:52px}.topbar>.team-summary .team-summary-text{display:none}}
+@media(min-width:861px) and (max-width:1500px){.topbar .brand-menu .header-wordmark{display:none}.topbar .brand-menu .header-mark{display:block}.topbar .crumb-name.middle-truncate{width:130px}.location-path button{max-width:100px}}
+@media(max-width:1250px){.topbar .service-trigger{width:52px}.topbar .settings-launch{width:36px}.topbar .settings-launch>span{display:none}}
+@media(max-width:860px){.inspector-tabs>button{min-height:44px}.topbar>.manual-history-controls{flex-basis:90px;min-width:90px}.topbar>.manual-history-controls>.icon-button{width:44px;min-width:44px}.topbar>.crumbs{flex-basis:calc(100% - 52px);width:auto}}
+
+@media(max-width:700px){.topbar .studio-launch{width:44px;min-width:44px;padding:0}}

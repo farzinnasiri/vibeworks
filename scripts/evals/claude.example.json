@@ -1,0 +1,9 @@
+{
+  "provider": "claude",
+  "agentCommand": ["claude", "-p", "{prompt}", "--output-format", "stream-json", "--verbose", "{mcpArgs}"],
+  "browserOpen": ["agent-browser", "--session", "{session}", "open", "{url}"],
+  "browserClose": ["agent-browser", "--session", "{session}", "close"],
+  "bridgePort": 24319,
+  "webPort": 25174,
+  "agentTimeoutSeconds": 1200
+}
