@@ -34,11 +34,26 @@
 <p align="center">
   <a href="#get-started">Get started</a> ·
   <a href="#connect-your-agent">Connect an agent</a> ·
-  <a href="#made-with-vibeworks">Gallery</a> ·
+  <a href="#inside-the-workspace">Gallery</a> ·
   <a href="docs/architecture.md">Architecture</a> ·
   <a href="#where-this-is-going">Milestones</a> ·
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <a href="docs/assets/showcase/f1-render.png"><img src="docs/assets/showcase/f1-render.png" alt="Formula-style race car rendered in Studio, with black and red bodywork, suspension and cockpit details"></a><br>
+      <strong>Formula-style race car</strong>
+    </td>
+    <td width="50%" align="center">
+      <a href="docs/assets/showcase/axiom-render.png"><img src="docs/assets/showcase/axiom-render.png" alt="Desktop five-axis mill rendered in Studio, with an enclosure, spindle, precision stages and rotary fixture"></a><br>
+      <strong>Desktop five-axis mill</strong>
+    </td>
+  </tr>
+</table>
+
+<p align="center"><sub>Example designs rendered in Studio. Model files are not included.</sub></p>
 
 ## Get started
 
@@ -99,35 +114,18 @@ Keep the browser alongside to watch work arrive, review the history and steer. `
 launch commands with this checkout's paths. The [connection guide](docs/mcp-setup.md) covers other MCP
 clients, CLI use and isolated workspaces.
 
-## Made with VibeWorks
-
-### VWR 12 race car
-
-[![VWR 12 race car, rendered in VibeWorks Studio with black and red bodywork, detailed suspension and a driver in the cockpit](docs/assets/showcase/f1-render.png)](docs/assets/showcase/f1-render.png)
-
-A Formula-style race car built as a project of reusable parts and subassemblies, including the chassis,
-aero surfaces, suspension, wheels and cockpit.
-
-### AXIOM M5 five-axis mill
-
-[![AXIOM M5 desktop five-axis mill, rendered in VibeWorks Studio with its enclosure, spindle, precision stages and rotary fixture visible](docs/assets/showcase/axiom-render.png)](docs/assets/showcase/axiom-render.png)
-
-A desktop mill with a structural frame, X/Y stages, Z spindle module and A/C rotary fixture.
-Both images are 4K Studio renders, path traced at 160 samples with denoising. These are design examples;
-see the [current limits](#current-limits) for engineering review requirements.
-
-### Inside the workspace
+## Inside the workspace
 
 Open any image at full resolution to inspect the interface.
 
 <table>
   <tr>
-    <td width="50%"><a href="docs/assets/showcase/f1-workspace.png"><img src="docs/assets/showcase/f1-workspace.png" alt="VWR 12 race car in the modeling workspace, with its assembly tree and exact dimensions"></a><br><strong>Explore an assembly.</strong> Follow the race car's reusable parts in the model tree.</td>
-    <td width="50%"><a href="docs/assets/showcase/axiom-workspace.png"><img src="docs/assets/showcase/axiom-workspace.png" alt="AXIOM M5 assembly with its five main subsystems and document details"></a><br><strong>Inspect the design.</strong> Review AXIOM's subsystems, overall size and geometry status.</td>
+    <td width="50%"><a href="docs/assets/showcase/f1-workspace.png"><img src="docs/assets/showcase/f1-workspace.png" alt="Race car in the modeling workspace, with its assembly tree and exact dimensions"></a><br><strong>Explore an assembly.</strong> Follow reusable parts in the model tree.</td>
+    <td width="50%"><a href="docs/assets/showcase/axiom-workspace.png"><img src="docs/assets/showcase/axiom-workspace.png" alt="Machine assembly with its main subsystems and document details"></a><br><strong>Inspect the design.</strong> Review subsystems, overall size and geometry status.</td>
   </tr>
   <tr>
-    <td><a href="docs/assets/showcase/axiom-history.png"><img src="docs/assets/showcase/axiom-history.png" alt="AXIOM M5 beside its committed history, with change descriptions and agent attribution"></a><br><strong>See who changed what.</strong> Committed history records changes across the project.</td>
-    <td><a href="docs/assets/showcase/axiom-studio.png"><img src="docs/assets/showcase/axiom-studio.png" alt="AXIOM M5 in Studio with lighting, exposure and output controls"></a><br><strong>Set up the image.</strong> Adjust Studio lighting, materials, cameras and output.</td>
+    <td><a href="docs/assets/showcase/axiom-history.png"><img src="docs/assets/showcase/axiom-history.png" alt="Assembly beside its committed history, with change descriptions and agent attribution"></a><br><strong>See who changed what.</strong> Committed history records changes across the project.</td>
+    <td><a href="docs/assets/showcase/axiom-studio.png"><img src="docs/assets/showcase/axiom-studio.png" alt="Machine assembly in Studio with lighting, exposure and output controls"></a><br><strong>Set up the image.</strong> Adjust Studio lighting, materials, cameras and output.</td>
   </tr>
   <tr>
     <td><a href="docs/assets/showcase/gear-section.png"><img src="docs/assets/showcase/gear-section.png" alt="A sectioned eight-tooth helical gear with face width and bore diameter design variables visible"></a><br><strong>Look inside a part.</strong> Section the helical gear while keeping its design variables in view.</td>
