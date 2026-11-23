@@ -31,10 +31,10 @@ defective model still produces a successful diagnostic score.
 No browser, bridge or model session is needed:
 
 ```sh
-npx tsx scripts/evals/score.ts artifacts/model.json
-npx tsx scripts/evals/score.ts artifacts/model.json --transcript artifacts/transcript.json --task scripts/evals/tasks/mounting-bracket.json
-npx tsx scripts/evals/score.ts artifacts/workspace.json --task scripts/evals/tasks/f1-assembly.json
-npx tsx scripts/evals/score.ts artifacts/workspace.json --document-id <part-UUID>
+pnpm exec tsx scripts/evals/score.ts artifacts/model.json
+pnpm exec tsx scripts/evals/score.ts artifacts/model.json --transcript artifacts/transcript.json --task scripts/evals/tasks/mounting-bracket.json
+pnpm exec tsx scripts/evals/score.ts artifacts/workspace.json --task scripts/evals/tasks/f1-assembly.json
+pnpm exec tsx scripts/evals/score.ts artifacts/workspace.json --document-id <part-UUID>
 ```
 
 The input is a complete document JSON or a workspace capture shaped as
@@ -79,8 +79,8 @@ check. Dependencies and authenticated agent CLIs must already be installed. It u
 `spawn`, not shell interpolation, and changes no global agent configuration.
 
 ```sh
-npx tsx scripts/evals/run.ts scripts/evals/tasks/mounting-bracket.json scripts/evals/codex.example.json
-npx tsx scripts/evals/run.ts scripts/evals/tasks/planetary-gearbox.json scripts/evals/claude.example.json
+pnpm exec tsx scripts/evals/run.ts scripts/evals/tasks/mounting-bracket.json scripts/evals/codex.example.json
+pnpm exec tsx scripts/evals/run.ts scripts/evals/tasks/planetary-gearbox.json scripts/evals/claude.example.json
 ```
 
 Each invocation creates `artifacts/evals/<task>-<unique>/` with a copied source stack and a dependency

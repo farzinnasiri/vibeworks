@@ -103,6 +103,16 @@ export async function deliver(command: CadCommand, result: CadResult): Promise<D
       output.image={...info,path:saved.path,...(outputs.length?{panels:outputs}:{})};
       return {result:output,isError:false,png:base64,pngs:panels.filter(p=>p.kind!=='view').map(p=>p.base64)};
     }
+    if (command.type === 'render_video' && result.video) {
+      // The bridge already saved the MP4 under artifacts/. Agents get its path and a poster frame to look at.
+      const { poster, ...video } = result.video;
+      const bytes = decodeBase64(poster.base64);
+      if (bytes.length < 24 || !bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) || bytes.readUInt32BE(16) !== poster.width || bytes.readUInt32BE(20) !== poster.height)
+        throw new Error('Video poster is not a PNG matching its reported dimensions.');
+      const saved = await saveArtifact(bytes, `studio-video-poster-r${result.revision ?? 'x'}.png`, 'image/png'); written.push(saved.path);
+      output.video = { ...video, poster: { path: saved.path, width: poster.width, height: poster.height } };
+      return { result: output, isError: false, png: poster.base64 };
+    }
     if(command.type==='documents'&&command.params.action==='asset'&&artifact){const bytes=decodeBase64(artifact.base64);const saved=await saveArtifact(bytes,artifact.filename,artifact.mimeType);output.artifact=saved;return {result:output,isError:false,resource:{uri:saved.uri,mimeType:saved.mimeType,blob:artifact.base64}};}
     if (command.type === 'export_model') {
       if (!artifact) throw new Error('Runtime returned no export bytes.');

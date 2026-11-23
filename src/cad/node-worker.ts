@@ -218,7 +218,7 @@ export class NodeGeometryWorker implements GeometryClient {
     replay?: { step: number; key: string },
     display?: import('../shared/protocol').DisplayRequest,
     projection?: boolean,
-    options: { meshes?: boolean; sections?: import('./types').SectionRequest;topologyQuery?:NonNullable<import('../shared/protocol').InspectionSelect['topology']> } = {},
+    options: { meshes?: boolean; renderMesh?: boolean; sections?: import('./types').SectionRequest;topologyQuery?:NonNullable<import('../shared/protocol').InspectionSelect['topology']> } = {},
   ): Promise<Evaluation> {
     return this.request(
       {
@@ -227,7 +227,7 @@ export class NodeGeometryWorker implements GeometryClient {
         documents,
         ...(analyze ? { analyze } : {}),
         ...(replay ? { replay } : {}), ...(display ? { display } : {}), ...(projection ? {projection} : {}),
-        ...(options.topologyQuery?{topologyQuery:options.topologyQuery}:{}),
+        ...(options.topologyQuery?{topologyQuery:options.topologyQuery}:{}), ...(options.renderMesh?{renderMesh:true as const}:{}),
         ...(options.meshes === false ? { meshes: false as const } : {}), ...(options.sections ? { sections: options.sections } : {}),
       },
       timeoutMs,

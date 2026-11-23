@@ -41,8 +41,6 @@ import {
   displayDeliverySchema,
 } from "./validation";
 import type { Outcome } from "../cad/runtime";
-import { studioVideoRequestSchema, studioVideoFrameSchema } from '../shared/protocol';
-import { StudioVideoEncoder, VideoEncodingError, MAX_VIDEO_FRAME } from './studio-video-encoder';
 
 export interface BridgeOptions {
   port?: number;
@@ -152,7 +150,6 @@ export async function startBridge(options: BridgeOptions = {}) {
     options.databasePath ?? (options.port === 0 ? ":memory:" : undefined),
   );
   let authority = new CommandAuthority(store, {...options,collaboration:store.collaboration,preparedDisplay:store.preparedDisplay});
-  const videoEncoder = new StudioVideoEncoder();
   const monitor=new ServiceMonitor();let restarting=false,activeCommands=0;
   const fingerprint = options.fingerprint ?? CONTRACT_FINGERPRINT;
   const currentFingerprint = options.currentFingerprint ?? workspaceFingerprint;
@@ -427,7 +424,7 @@ export async function startBridge(options: BridgeOptions = {}) {
       if(req.method==='POST'&&req.url==='/service/restart'){
         authenticate(req);serviceRestartSchema.parse(await readBody(req));
         if(restarting)throw new HttpError(409,'SERVICE_RESTARTING','The service is already restarting.');
-        if(activeCommands||!authority.canRestart||videoEncoder.busy)throw new HttpError(409,'SERVICE_BUSY','Wait for active requests and renders to finish before restarting.');
+        if(activeCommands||!authority.canRestart)throw new HttpError(409,'SERVICE_BUSY','Wait for active requests and renders to finish before restarting.');
         restarting=true;
         try{await authority.close();authority=new CommandAuthority(store,{...options,collaboration:store.collaboration,preparedDisplay:store.preparedDisplay});await authority.ready();
           if(authority.phase!=='ready')throw new HttpError(503,'SERVICE_UNAVAILABLE',authority.error??'Service could not start.');monitor.restart();sendJson(res,200,{ok:true});
@@ -470,37 +467,22 @@ export async function startBridge(options: BridgeOptions = {}) {
           :store.workspaceViews.acknowledge(input.viewerId,input.sessionId,input.requestId,input.status,input.error);
         sendJson(res,200,value);return;
       }
-      if (req.method === 'POST' && req.url?.startsWith('/studio-video')) {
+      if (req.method === 'GET' && req.url?.startsWith('/studio-video/result?')) {
         authenticate(req);
+        const jobId = z.uuid().safeParse(new URL(req.url, 'http://127.0.0.1').searchParams.get('jobId'));
+        if (!jobId.success) throw new HttpError(400, 'INVALID_REQUEST', 'A valid video job ID is required.');
+        let bytes: Buffer;
         try {
-          if (req.url.startsWith('/studio-video/frame?')) {
-            if (req.headers['content-type'] !== 'image/png') throw new HttpError(415, 'CONTENT_TYPE_REQUIRED', 'Send an image/png frame.');
-            const url = new URL(req.url, 'http://127.0.0.1');
-            const frame = studioVideoFrameSchema.parse(Object.fromEntries(url.searchParams));
-            if (Number(req.headers['content-length']) > MAX_VIDEO_FRAME) throw new HttpError(413, 'PAYLOAD_TOO_LARGE', 'Video frames are limited to 16 MiB.');
-            const chunks: Buffer[] = []; let length = 0;
-            for await (const chunk of req) {
-              length += chunk.length;
-              if (length > MAX_VIDEO_FRAME) throw new HttpError(413, 'PAYLOAD_TOO_LARGE', 'Video frames are limited to 16 MiB.');
-              chunks.push(chunk);
-            }
-            sendJson(res, 200, await videoEncoder.frame(frame.id, frame.index, Buffer.concat(chunks)));
-          } else if (req.url === '/studio-video') {
-            const input = studioVideoRequestSchema.parse(await readBody(req, 4096));
-            if(restarting&&input.action==='start')throw new HttpError(409,'SERVICE_RESTARTING','The service is restarting. No render was started.');
-            if (input.action === 'start') sendJson(res, 200, await videoEncoder.start(input.encoding));
-            else if (input.action === 'cancel') { await videoEncoder.cancel(input.id); sendJson(res, 200, { id: input.id, frames: 0 }); }
-            else {
-              const bytes = await videoEncoder.finish(input.id);
-              res.writeHead(200, { 'Content-Type': 'video/mp4', 'Content-Length': bytes.length, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
-              res.end(bytes);
-            }
-          } else throw new HttpError(404, 'NOT_FOUND', 'Unknown video endpoint.');
+          bytes = await authority.videoOutput(jobId.data);
         } catch (error) {
-          if (error instanceof VideoEncodingError) throw new HttpError(error.status, 'VIDEO_ENCODING_FAILED', error.message);
-          if (error instanceof z.ZodError) throw new HttpError(400, 'INVALID_REQUEST', 'Invalid video encoding request.');
+          if (error instanceof CadError && error.code === 'RENDER_JOB_NOT_FOUND')
+            throw new HttpError(404, error.code, error.message);
+          if (error instanceof CadError && error.code === 'RENDER_NOT_READY')
+            throw new HttpError(409, error.code, error.message);
           throw error;
         }
+        res.writeHead(200, { 'Content-Type': 'video/mp4', 'Content-Length': bytes.length, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+        res.end(bytes);
         return;
       }
       if (req.method === "POST" && req.url === "/probe") {
@@ -688,7 +670,6 @@ export async function startBridge(options: BridgeOptions = {}) {
       async close() {
         if (stopped) return;
         stopped = true;
-        await videoEncoder.close();
         await authority.close();
         await new Promise<void>((resolve) => {
           server.close(() => resolve());
@@ -706,7 +687,6 @@ export async function startBridge(options: BridgeOptions = {}) {
       },
     };
   } catch (error) {
-    await videoEncoder.close();
     await authority.close();
     server.close();
     store.close();

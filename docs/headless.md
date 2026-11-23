@@ -10,10 +10,10 @@ make renderer-install
 make headless
 # another terminal
 make doctor
-npm run -s cad -- agent_session '{"action":"join","client":"cli"}'
+pnpm --silent run cad agent_session '{"action":"join","client":"cli"}'
 # Copy session.sessionId into subsequent commands:
-npm run -s cad -- documents '{"action":"create","name":"Part"}' --session <session-uuid>
-npm run -s cad -- inspect_model '{"documentId":"UUID from creation"}' --session <session-uuid>
+pnpm --silent run cad documents '{"action":"create","name":"Part"}' --session <session-uuid>
+pnpm --silent run cad inspect_model '{"documentId":"UUID from creation"}' --session <session-uuid>
 ```
 
 Use explicit document IDs in multi-document work. A read with no ID addresses the service's startup document.
@@ -83,7 +83,7 @@ remain explicit. MCP returns actual image content as well as a saved PNG path, n
 On this machine Node 26 stalled in the Playwright ZIP extractor; Node 22 completed the same pinned installer:
 
 ```sh
-npx --yes --package=node@22 node node_modules/playwright/cli.js install chromium --only-shell
+pnpm --package=node@22 dlx node node_modules/playwright/cli.js install chromium --only-shell
 ```
 
 This is an installation workaround only. The shipped authority was verified under Node 26. No global Node

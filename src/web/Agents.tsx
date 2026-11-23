@@ -239,7 +239,7 @@ function AgentLink({ connection, doc, reconnect }: { connection: ConnectionState
       <p className="field-hint">{connected
         ? 'Codex or Claude Code can inspect, edit, render and export this document through MCP. Every edit names the document and revision, so a stale call is rejected instead of overwriting your work.'
         : connection.phase === 'rejected' ? 'The Node authority rejected the connection. Follow the details below, then reconnect.'
-          : 'The Node authority is unavailable. The last model stays visible; editing resumes after reconnection. Start npm run headless.'}</p>
+          : 'The Node authority is unavailable. The last model stays visible; editing resumes after reconnection. Start pnpm run headless.'}</p>
       {!connected && <p className="mono-small muted">{connection.message}</p>}
       <dl className="handle">
         <div><dt>documentId</dt><dd><code>{doc.documentId}</code>

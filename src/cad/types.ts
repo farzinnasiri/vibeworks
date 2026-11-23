@@ -6,7 +6,7 @@ export interface SectionRequest { featureId?: string; planes: { axis: 'X' | 'Y' 
 export type WorkerTask =
   | { type: 'initialize' }
   | {type:'extract_validate';before:CadDocument[];after:CadDocument[];affected:string[]}
-  | { type: 'evaluate'; topologyQuery?:NonNullable<import('../shared/protocol').InspectionSelect['topology']>; projection?: boolean; meshes?: false; document: CadDocument; documents?: CadDocument[]; replay?: { step: number; key: string }; display?: import('../shared/protocol').DisplayRequest; analyze?: { featureIds?: string[]; control?:import('./analysis-plan').AnalysisControl }; sections?: SectionRequest }
+  | { type: 'evaluate'; renderMesh?: true; topologyQuery?:NonNullable<import('../shared/protocol').InspectionSelect['topology']>; projection?: boolean; meshes?: false; document: CadDocument; documents?: CadDocument[]; replay?: { step: number; key: string }; display?: import('../shared/protocol').DisplayRequest; analyze?: { featureIds?: string[]; control?:import('./analysis-plan').AnalysisControl }; sections?: SectionRequest }
   | { type: 'export'; format: 'step' | 'stl'; featureIds: string[]; document: CadDocument; documents?: CadDocument[] };
 /** budgetMs is the caller's remaining time; the worker ends optional work (analysis) before it. */
 export type WorkerRequest = WorkerTask & { id: number; budgetMs?: number; analysisSeed?: import('./analysis-cache').AnalysisCheckpoint };

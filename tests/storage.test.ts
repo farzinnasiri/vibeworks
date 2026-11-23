@@ -103,7 +103,7 @@ test('project operations share the common parser and advertised action schema', 
   const inputs=[{action:'create_project',projectId,name:'F1'},{action:'rename_project',projectId,name:'F2',expectedStorageVersion:1},{action:'move',documentId,projectId,expectedStorageVersion:1},{action:'set_main_assembly',projectId,documentId,expectedStorageVersion:1},{action:'history',documentId}];
   for (const input of inputs) { assert.equal(commandSchemas.documents.safeParse(input).success,true); assert.equal(advertised.safeParse(input).success,true); }
   assert.equal(commandSchemas.documents.safeParse({action:'rename',documentId,name:'stale'}).success,false);
-  assert.equal(Object.keys(commandSchemas).length,13);
+  assert.equal(Object.keys(commandSchemas).length,14);
 });
 
 test('a failure inside the SQLite transaction rolls back the document, undo data, audit and change feed together', async t => {

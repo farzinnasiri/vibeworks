@@ -57,7 +57,7 @@
 
 ## Get started
 
-You need Node.js 22.13 or newer and Make. Run `make` to see what each command does.
+You need Node.js 22.13 or newer, pnpm 12.16.1 and Make. Run `make` to see what each command does.
 
 ```sh
 git clone https://github.com/farzinnasiri/vibeworks.git
@@ -170,6 +170,8 @@ committed history, agent activity and undo. Named variables carry dimensions thr
 reusable source parts carry their changes into placed assembly components.
 
 ## Where this is going
+
+Read the [VibeWorks vision](docs/vision.md) for the direction behind these milestones.
 
 Checked milestones are available within the [current limits](#current-limits). Open milestones are product
 directions, not release commitments or dates.

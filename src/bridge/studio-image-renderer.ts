@@ -69,7 +69,7 @@ export class StudioImageRenderer {
       if(error instanceof CadError)throw error;
       const missing=/Executable doesn't exist/.test(String(error));
       throw new CadError(missing?'RENDERER_DEPENDENCY':'STUDIO_RENDER_FAILED',
-        (missing?'Install the pinned Chromium with npm run renderer:install. ':'Studio image failed; no raster fallback was returned. ')+String(error));
+        (missing?'Install the pinned Chromium with pnpm run renderer:install. ':'Studio image failed; no raster fallback was returned. ')+String(error));
     } finally {clearInterval(poll);signal.removeEventListener('abort',abort);await browser?.close().catch(()=>{});}
   };
 }

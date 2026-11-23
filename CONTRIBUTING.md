@@ -17,7 +17,7 @@ the person submitting the change is responsible for understanding and checking i
 
 ## Development
 
-Use Node.js 22.13 or newer and Make. From the repository root:
+Use Node.js 22.13 or newer, pnpm 12.16.1 and Make. From the repository root:
 
 ```sh
 make install
@@ -45,7 +45,8 @@ make test
 make build
 ```
 
-The test script runs files serially to keep simultaneous native kernels within a smaller memory budget. For a focused
+Video tests also require FFmpeg and ffprobe on PATH. The test script runs files serially to keep simultaneous
+native kernels within a smaller memory budget. For a focused
 run, use `node --import tsx --test tests/<name>.test.ts`. Test the behavior affected by the change; a build
 alone does not verify an interaction, exact export interoperability or live agent operation.
 

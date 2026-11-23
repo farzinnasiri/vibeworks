@@ -547,6 +547,8 @@ export const documentSchema = z
     /** Physical analysis settings and declared checks. Absent means automatic analysis with defaults. */
     analysis: analysisSettingsSchema.optional(),
     presentation: presentationSchema.optional(),
+    /** Saved Studio camera move and video output (display-only, like presentation). Defined below; read lazily. */
+    video: z.lazy((): z.ZodType<StudioVideoRecipe> => studioVideoRecipeSchema).optional(),
     selectedFeatureIds: z.array(featureIdSchema).max(MAX_FEATURES),
   })
   .strict();
@@ -578,17 +580,19 @@ const shotFeatureIds = z.array(featureIdSchema).min(1).max(MAX_FEATURES);
  * One camera the agent chooses: a direction, what to fit in the tile (zoom), and what to leave out of the way.
  * Framing is in model terms, so the same shot stays meaningful after edits.
  */
+/** What fills a shot: results, a box, or a sphere around a detail. */
+export const shotFrameSchema = z.union([
+  z.object({ featureIds: shotFeatureIds }).strict(),
+  z.object({ min: vectorSchema, max: vectorSchema }).strict().refine(b => b.min.every((v, i) => v <= b.max[i]), 'frame min must not exceed max.'),
+  z.object({ center: vectorSchema, radiusMm: dimension }).strict(),
+]);
 export const shotSchema = z.object({
   view: viewNameSchema.or(z.literal('perspective')).optional(),
   /** Camera position relative to the framed center, e.g. [1,-1,1]; the camera looks back at the center. */
   from: directionSchema.optional(),
   up: directionSchema.optional(),
   /** What fills the tile: results, a box, or a sphere around a detail. Omit to frame everything shown. */
-  frame: z.union([
-    z.object({ featureIds: shotFeatureIds }).strict(),
-    z.object({ min: vectorSchema, max: vectorSchema }).strict().refine(b => b.min.every((v, i) => v <= b.max[i]), 'frame min must not exceed max.'),
-    z.object({ center: vectorSchema, radiusMm: dimension }).strict(),
-  ]).optional(),
+  frame: shotFrameSchema.optional(),
   projection: z.enum(['orthographic', 'perspective']).optional(),
   fovDegrees: z.number().finite().min(10).max(100).optional(),
   hide: shotFeatureIds.optional(),
@@ -678,11 +682,14 @@ export const studioVideoCameraSchema = z.object({
   focalLengthMm: z.number().finite().min(10).max(300),
 }).strict().refine(c => Math.hypot(...c.position.map((v, i) => v - c.target[i])) > 1e-6, 'Camera must be away from its target.');
 export type StudioVideoCamera = z.infer<typeof studioVideoCameraSchema>;
+export const studioVideoMotionSchema = z.enum(['smooth', 'orbit', 'move', 'cut']);
+export const studioVideoEasingSchema = z.enum(['auto', 'linear', 'ease_in', 'ease_out', 'ease_in_out']);
 export const studioVideoViewSchema = z.object({
   id: z.string().uuid(), name: z.string().trim().min(1).max(40), camera: studioVideoCameraSchema,
   presentation: presentationSchema,
-  motion: z.enum(['orbit', 'move', 'cut']), seconds: z.number().finite().min(0.5).max(10),
+  motion: studioVideoMotionSchema, seconds: z.number().finite().min(0.5).max(10),
   hold: z.number().finite().min(0).max(5),
+  easing: studioVideoEasingSchema.optional(), focus: shotFrameSchema.optional(),
 }).strict();
 export type StudioVideoView = z.infer<typeof studioVideoViewSchema>;
 export const studioVideoSequenceSchema = z.array(studioVideoViewSchema).min(1).max(12)
@@ -691,19 +698,91 @@ export const studioVideoSequenceSchema = z.array(studioVideoViewSchema).min(1).m
     const duration = views.reduce((n, v, i) => n + v.hold + (i && v.motion !== 'cut' ? v.seconds : 0), 0);
     return duration >= 0.5 && duration <= 20;
   }, 'Video must last between 0.5 and 20 seconds.');
-export const studioVideoEncodingSchema = z.object({
-  id: z.string().uuid(), width: z.literal(1920).or(z.literal(1280)),
-  height: z.literal(1080).or(z.literal(720)), fps: z.literal(24),
-  frames: z.number().int().min(12).max(480),
-}).strict().refine(s => s.width * 9 === s.height * 16, 'Video must use a 16:9 output size.');
-export type StudioVideoEncoding = z.infer<typeof studioVideoEncodingSchema>;
-export const studioVideoRequestSchema = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('start'), encoding: studioVideoEncodingSchema }).strict(),
-  z.object({ action: z.literal('finish'), id: z.string().uuid() }).strict(),
-  z.object({ action: z.literal('cancel'), id: z.string().uuid() }).strict(),
+/** Social and film aspect ratios; the short side follows resolution (1080p 9:16 is 1080 x 1920). */
+export const VIDEO_ASPECTS = { '16:9': [16, 9], '9:16': [9, 16], '1:1': [1, 1], '4:5': [4, 5] } as const;
+export const VIDEO_RESOLUTIONS = { '720p': 720, '1080p': 1080, '4k': 2160 } as const;
+export const MAX_VIDEO_SECONDS = 20, MAX_VIDEO_FRAMES = 1200;
+export const studioVideoOutputSchema = z.object({
+  aspect: z.enum(['16:9', '9:16', '1:1', '4:5']).default('16:9'),
+  resolution: z.enum(['720p', '1080p', '4k']).default('1080p'),
+  fps: z.union([z.literal(24), z.literal(30), z.literal(60)]).default(30),
+  quality: z.enum(['standard', 'high']).default('standard'),
+  meshDetail: z.enum(['standard','fine']).optional().describe('Final video tessellation from exact B-reps. Fine is the default; standard uses the ordinary bounded display profile.'),
+  depthOfField: z.object({ fStop:z.number().finite().min(1).max(32).default(4) }).strict().optional().describe('Optional final-frame depth of field. Focus follows each keyframe target; omit to keep the full frame sharp.'),
+}).strict();
+export type StudioVideoOutput = z.infer<typeof studioVideoOutputSchema>;
+export function videoOutputSize(output: Pick<StudioVideoOutput, 'aspect' | 'resolution'>): { width: number; height: number } {
+  const [w, h] = VIDEO_ASPECTS[output.aspect], short = VIDEO_RESOLUTIONS[output.resolution];
+  const even = (n: number) => Math.round(n / 2) * 2;
+  return w >= h ? { width: even(short * w / h), height: short } : { width: short, height: even(short * h / w) };
+}
+export const STUDIO_VIDEO_PRESETS = ['turntable', 'half_orbit', 'push_pull', 'detail_reveal', 'crane'] as const;
+/** A keyframe names a semantic shot (framed for the output at render time) or an exact camera. */
+export const studioVideoJobSchema = z.object({
+  jobId: z.string().uuid(), state: z.enum(['queued', 'running', 'complete', 'cancelled', 'error']),
+  phase: z.enum(['queued', 'preparing', 'rendering', 'encoding', 'complete', 'cancelled', 'error']),
+  createdAt: z.string(), expiresAt: z.string(), output: studioVideoOutputSchema,
+  width: z.number().int().positive(), height: z.number().int().positive(),
+  seconds: z.number().nonnegative(), frames: z.number().int().nonnegative(), completedFrames: z.number().int().nonnegative(),
+  elapsedMs: z.number().nonnegative(), etaMs: z.number().nonnegative().optional(),
+  /** The cameras the recipe resolved to, reusable as exact keyframes after an edit. */
+  keyframes: z.array(z.object({ name: z.string(), camera: studioVideoCameraSchema, seconds: z.number(), hold: z.number(), motion: studioVideoMotionSchema,
+    easing: studioVideoEasingSchema.optional(), focus: shotFrameSchema.optional() }).strict()).optional(),
+  renderer: z.literal('three-webgl/studio'),
+  error: z.object({ code: z.string(), message: z.string() }).strict().optional(),
+}).strict();
+export type StudioVideoJob = z.infer<typeof studioVideoJobSchema>;
+export const studioVideoKeyframeSchema = z.object({
+  name: z.string().trim().min(1).max(40).optional(),
+  shot: studioShotSchema.optional(),
+  camera: studioVideoCameraSchema.optional(),
+  /** How the camera travels into this keyframe. orbit keeps distance around the target; move goes straight; cut jumps. */
+  motion: studioVideoMotionSchema.default('orbit'),
+  seconds: z.number().finite().min(0.5).max(10).default(2.5),
+  hold: z.number().finite().min(0).max(5).default(0),
+  /** Scene overrides at this keyframe; numeric settings blend during travel. */
+  presentation: presentationSchema.optional(),
+  easing: studioVideoEasingSchema.optional(),
+  focalLengthMm: z.number().finite().min(10).max(300).optional(),
+  /** Aim at visible feature/component results, a box or a detail sphere. Resolved against the captured model. */
+  focus: shotFrameSchema.optional(),
+}).strict().refine(k => !!k.shot !== !!k.camera, 'A keyframe has either shot or camera.');
+export const studioVideoPresetSchema = z.object({
+  name: z.enum(STUDIO_VIDEO_PRESETS),
+  /** Starting framing. Default: everything shown, from the front-left three-quarter view. */
+  shot: studioShotSchema.optional(),
+  /** Close-up target for push_pull, detail_reveal and crane. Default: the centre of the shot. */
+  focus: shotFrameSchema.optional(),
+  seconds: z.number().finite().min(2).max(MAX_VIDEO_SECONDS).optional(),
+  direction: z.enum(['clockwise', 'counterclockwise']).optional(),
+}).strict();
+export const studioVideoAnimationSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('construction'), fromStep: z.number().int().min(1).max(MAX_ASSEMBLY_FEATURES).optional(),
+    toStep: z.number().int().min(1).max(MAX_ASSEMBLY_FEATURES).optional() }).strict(),
+  z.object({ kind: z.literal('exploded'), offsets: z.array(z.object({ featureId: featureIdSchema, offsetMm: vectorSchema }).strict()).min(1).max(64),
+    direction: z.enum(['out', 'in', 'out_and_back']).default('out_and_back') }).strict(),
 ]);
-export const studioVideoFrameSchema = z.object({ id: z.string().uuid(), index: z.coerce.number().int().min(0).max(479) }).strict();
-export const studioVideoAckSchema = z.object({ id: z.string().uuid(), frames: z.number().int().min(0).max(480) }).strict();
+export type StudioVideoAnimation = z.infer<typeof studioVideoAnimationSchema>;
+/** One recipe for agents and people: a preset or up to 12 keyframes, plus output. Saved with the model by set_video. */
+export const studioVideoRecipeSchema = z.object({
+  preset: studioVideoPresetSchema.optional(),
+  keyframes: z.array(studioVideoKeyframeSchema).min(2).max(12).optional(),
+  output: studioVideoOutputSchema.optional(),
+  animation: studioVideoAnimationSchema.optional(),
+}).strict().refine(r => !!r.preset !== !!r.keyframes, 'A video recipe has either preset or keyframes.')
+  .refine(r => !r.keyframes || r.keyframes.reduce((n, k, i) => n + k.hold + (i && k.motion !== 'cut' ? k.seconds : 0), 0) <= MAX_VIDEO_SECONDS,
+    `Video must last at most ${MAX_VIDEO_SECONDS} seconds.`);
+export type StudioVideoRecipe = z.infer<typeof studioVideoRecipeSchema>;
+export const studioVideoEncodingSchema = z.object({
+  id: z.string().uuid(),
+  width: z.number().int().min(256).max(3840).refine(n => n % 2 === 0, 'Video width must be even.'),
+  height: z.number().int().min(256).max(3840).refine(n => n % 2 === 0, 'Video height must be even.'),
+  fps: z.union([z.literal(24), z.literal(30), z.literal(60)]),
+  frames: z.number().int().min(12).max(MAX_VIDEO_FRAMES),
+  quality: z.enum(['standard', 'high']).default('standard'),
+}).strict();
+/** Input form: quality may be omitted and means standard. */
+export type StudioVideoEncoding = z.input<typeof studioVideoEncodingSchema>;
 
 /** What each rendered tile actually showed, so a shot can be measured in and repeated after an edit. */
 export interface RenderedTile {
@@ -719,6 +798,7 @@ export interface RenderedTile {
 export const editSchema = z.discriminatedUnion('op', [
   z.object({ op:z.literal('appearance'), target:surfaceTargetSchema, regions:z.object({upsert:z.array(paintRegionSchema).max(32).optional(),remove:z.array(featureIdSchema).max(32).optional()}).strict().optional(), set:appearanceFieldSchema.optional(), unset:z.array(z.enum(['material','color','finish','detail','coat','roughness','detailScale','visualMaterial'])).max(8).optional(), replace:appearanceSchema.nullable().optional(), graphics:z.object({upsert:z.array(surfaceGraphicSchema).max(8).optional(),remove:z.array(featureIdSchema).max(8).optional(),order:z.array(featureIdSchema).max(8).optional()}).strict().optional() }).strict(),
   z.object({ op: z.literal('set_presentation'), presentation: presentationSchema.nullable() }).strict(),
+  z.object({ op: z.literal('set_video'), video: studioVideoRecipeSchema.nullable() }).strict(),
   z.object({ op: z.literal('add'), before: featureIdSchema.optional(), feature: featureSchema }).strict(),
   z.object({ op: z.literal('update'), feature: featureSchema }).strict(),
   z
@@ -849,7 +929,7 @@ export const commandSchemas = {
     ...(['status','cancel'] as const).map(action => z.object({action:z.literal(action),sessionId:z.string().uuid().optional(),requestId:z.string().uuid()}).strict()),
   ]),
   agent_session: z.object({action:z.enum(['join','resume','heartbeat','update','handoff','leave']),agent:z.string().max(120).optional(),kind:z.enum(['agent','human']).optional(),client:z.string().min(1).max(80).optional(),model:z.string().max(120).optional(),role:z.string().max(120).optional(),task:z.string().max(500).optional(),projectIds:z.array(uuid).max(64).optional(),focus:focusSchema.optional(),parentAgentId:uuid.optional(),clientInstanceId:uuid.optional(),phase:z.string().max(160).optional(),workState:z.enum(['working','waiting','completed']).optional(),sessionId:uuid.optional(),handoff:z.string().max(8000).optional(),continuedFrom:z.string().max(120).optional()}).strict(),
-  describe:z.object({tool:z.enum(['workspace_view','agent_session','activity','describe','apply_edits','select_features','inspect_model','analyze_model','documents','render_views','render_image','export_model','document_action']),kind:z.enum(['box','cylinder','rod','instance','extrude','fill','join','loft','sweep','shell','revolve','union','subtract','intersect','fillet','chamfer','transform','mirror','pattern','text','drill_holes']).optional(),action:z.string().max(80).optional(),sessionId:uuid.optional()}).strict(),
+  describe:z.object({tool:z.enum(['workspace_view','agent_session','activity','describe','apply_edits','select_features','inspect_model','analyze_model','documents','render_views','render_image','render_video','export_model','document_action']),kind:z.enum(['box','cylinder','rod','instance','extrude','fill','join','loft','sweep','shell','revolve','union','subtract','intersect','fillet','chamfer','transform','mirror','pattern','text','drill_holes']).optional(),action:z.string().max(80).optional(),sessionId:uuid.optional()}).strict(),
   activity: z.object({sessionId:uuid.optional(),projectId:uuid.optional(),documentId:uuid.optional(),agentId:uuid.optional(),after:z.number().int().nonnegative().optional(),before:z.number().int().positive().optional(),limit:z.number().int().min(1).max(100).optional(),changesOnly:z.boolean().optional()}).strict(),
   apply_edits: z
     .object({
@@ -911,6 +991,15 @@ export const commandSchemas = {
       documentId: uuid, expectedRevision: z.number().int().nonnegative().optional(),
       expectedStorageVersion: z.number().int().positive().optional(),
       shot: studioShotSchema.optional(), output: studioImageOutputSchema.optional(),
+      presentation: presentationSchema.optional(), skipAnalysis: z.boolean().optional(),
+    }).strict(),
+    ...(['status', 'result', 'cancel'] as const).map(action => z.object({action:z.literal(action),jobId:uuid,sessionId:uuid.optional()}).strict()),
+  ]),
+  render_video: z.discriminatedUnion('action', [
+    z.object({ action: z.literal('start'), requestId: uuid, sessionId: uuid.optional(),
+      documentId: uuid, expectedRevision: z.number().int().nonnegative().optional(),
+      expectedStorageVersion: z.number().int().positive().optional(),
+      video: studioVideoRecipeSchema.optional(), output: studioVideoOutputSchema.partial().optional(),
       presentation: presentationSchema.optional(), skipAnalysis: z.boolean().optional(),
     }).strict(),
     ...(['status', 'result', 'cancel'] as const).map(action => z.object({action:z.literal(action),jobId:uuid,sessionId:uuid.optional()}).strict()),
@@ -1007,7 +1096,7 @@ committed model; transport outcomeUnknown requires inspection. Read health/nextS
 review:{shots?,tileSize?,appearance?,compareTo?:snapshotId,sections?,profiles?} adds post-commit evidence (see render_views).
 reviewFailure means the edit committed; retry render_views, never the edit.
 Edits: add/update {feature}; delete {featureIds,cascade}; set_parameter {name,value,description?};
-delete_parameter {name}; set_presentation {presentation:{preset?,exposure?,environment?,keyIntensity?,lightRotation?,background?,shadows?}|null}; set_analysis {auto?,ground?,toleranceMm?}; set_check
+delete_parameter {name}; set_presentation {presentation:{preset?,exposure?,environment?,keyIntensity?,lightRotation?,background?,shadows?}|null}; set_video {video:{preset|keyframes,output?}|null} saves the Studio camera move render_video uses by default; set_analysis {auto?,ground?,toleranceMm?}; set_check
 {check:{id,a,b,expect:'contact'|'clearance'|'no_interference'|'overlap',minGapMm?,note?}} or a design target
 {check:{id,a?,note?,expect:'size',axis,mm,toleranceMm} | expect:'within',min,max | expect:'section',axis,
 offset,widthMm?,heightMm?,toleranceMm} measuring feature a's exact result or, without a, the whole model;
@@ -1116,6 +1205,7 @@ kernel validation, geometry.mounts with resolved attachment frames, health/nextS
 REVISION_CONFLICT or outcomeUnknown before editing again.`,
   },
   render_image: { effect: 'read', description: `Final Studio PNG using the same WebGPU path tracer and guided denoiser as the browser. No human tab required. start requires documentId and a UUID requestId (also the jobId); identical retries reuse the job, different inputs with that id fail. Capture committed geometry/source revisions and saved presentation plus optional overrides. Optional shot uses render_views framing, hide, projection and fovDegrees, without section/ghost overlays. output:{size:'hd'|'qhd'|'uhd'|'square'|'portrait',quality:'draft'|'standard'|'high',denoise:boolean}; defaults HD/Standard/denoise on. start promptly freezes the committed definition graph. Exact Node preparation and analysis run inside the image job before tracing. status returns progress; result returns the completed PNG as MCP image and saved artifact; cancel stops queued/running work. Calls use action plus jobId after start, without document context. One running and one queued image; ten-minute job deadline including queue, fifteen-minute retention, eight retained jobs and 64 MiB encoded image budget. Jobs are local to this bridge lifetime. Later edits never alter a captured job. A final image is visual evidence, not a geometry/analysis certificate. No raster fallback if WebGPU/denoising fails.` },
+  render_video: { effect: 'read', description: `Studio MP4 of the committed model with a moving camera, rendered by the managed renderer. No human tab required. start requires documentId and a UUID requestId (also the jobId); identical retries reuse the job. video is a recipe: either preset:{name:'turntable'|'half_orbit'|'push_pull'|'detail_reveal'|'crane',shot?,focus?,seconds?,direction?} or keyframes:[{shot|camera,motion:'orbit'|'move'|'cut',seconds,hold,presentation?}] (2-12). shot uses render_views framing (view/from, frame featureIds|box|sphere, fovDegrees) and is framed for the output aspect at render time; focus names what push_pull, detail_reveal and crane move in on. Omit video to use the recipe saved with set_video, else a turntable. output:{aspect:'16:9'|'9:16'|'1:1'|'4:5',resolution:'720p'|'1080p'|'4k',fps:24|30|60,quality:'standard'|'high'}; defaults 16:9 1080p 30 fps standard, overriding the saved output field by field. Up to ${MAX_VIDEO_SECONDS} s and ${MAX_VIDEO_FRAMES} frames. Uses saved presentation plus overrides; per-keyframe presentation blends numeric settings while the camera travels. status returns progress; result saves the MP4 as an artifact, returns its path and a poster frame as an MCP image, and lists the resolved camera keyframes so a move can be repeated exactly after an edit. cancel stops queued/running work. One running and one queued video; twenty-minute deadline including queue. Later edits never alter a captured job. Studio raster rendering (same look as the live Studio preview); not a geometry certificate.` },
   analyze_model: {effect:'read',description:`Durable exact leaf-solid analysis. run (default) pins the complete source graph and settings, starts once and advances automatically. Returns analysisJob.id, state, current and progress. status/result/cancel accept jobId; waitMs is bounded to 20000; page.limit bounds findings and page.cursor continues a pinned job. A restart resumes queued/running jobs; cancel persists. New commits supersede current jobs. snapshot explicitly inspects a historical graph without certifying the current graph. Leaf identities include feature, occurrence path, source and solidIndex. Compounds and patterns reveal internal relationships. Broad-phase bounds only rule out contact/interference; reported nearest distances and clearance remain exact. Unknown/timeouts and partial or stale jobs block health.ok. One bounded background Node worker; each native pair gets a deadline and at most one late isolated retry. Facts survive restart and are reused by complete construction and relative placement. Checks accept legacy feature strings or {feature,path?,solidIndex?}. Inspect expensive pairs through analysisJob.expensive. Rendering is review evidence, never human approval.`},
   render_views: {
     effect: 'read',
@@ -1245,7 +1335,7 @@ Keep automatic analysis on. analyze:false skips an intermediate mutation; set_an
 Restore auto:true before finishing. Subset, skipped or incomplete analysis cannot certify completion.
 Done requires health.ok with targets passing, reviewed images and appearance, and intended relationships declared.
 inspect_model snapshot:{} freezes a graph; snapshot:{id} reuses it and snapshot:{sequence} inspects historical state. Reads never restore live data.
-Use render_image for final Studio PNGs; start, status, result, cancel. Inspect render_views with appearance:'issues' and 'materials'. Export preflight checks unchecked models;
+Use render_image/render_video for Studio PNGs/MP4s; start, status, result, cancel. Inspect render_views with appearance:'issues' and 'materials'. Export preflight checks unchecked models;
 skipAnalysis:true is for intermediate/recovery output only. Report unresolved findings as unfinished.
 When asked to show the human a view, workspace_view present controls document, selection, cameras, layout and Studio. Check status; saved/pending does not mean applied.
 
@@ -1275,6 +1365,7 @@ export const AGENT_TOOLS = [
   'analyze_model',
   'render_views',
   'render_image',
+  'render_video',
   'export_model',
   'select_features',
   'document_action',
@@ -1313,7 +1404,7 @@ export function commandInputSchema(name: CommandName, kind?: Feature['kind']): R
     schema = commandSchemas.apply_edits.safeExtend({ edits: z.array(edits).min(1).max(MAX_FEATURES) });
   }
   const json = z.toJSONSchema(schema, { reused: 'ref', io:'input' }) as Record<string, unknown>;
-  if (name === 'render_image'||name === 'workspace_view') json.type = 'object';
+  if (name === 'render_image'||name === 'render_video'||name === 'workspace_view') json.type = 'object';
   if (name === 'documents') {
     const shape = commandSchemas.documents.shape;
     json.oneOf = Object.entries(documentActionFields).map(([action, fields]) => ({
@@ -1406,6 +1497,7 @@ export function commandRequirements(name: CommandName, action?: string): string 
     return action ? requirements[action] ?? 'Unknown documents action.' : Object.entries(requirements).map(([key, value]) => `${key}: ${value}`).join('\n');
   }
   if(name==='render_image')return 'start requires documentId and requestId UUID; status/result/cancel require jobId; optional expectedRevision pins capture';
+  if(name==='render_video')return 'start requires documentId and requestId UUID; optional video recipe (preset or keyframes) and output; status/result/cancel require jobId';
   if(name==='workspace_view')return 'present requires documentId and state; optional expectedRevision/viewerId/requestId; get optionally takes projectId; status/cancel require requestId';
   if(name==='inspect_model')return 'optional documentId; top-level expectedRevision is not accepted; replay.step is 1-based and requires nested expectedRevision/expectedStorageVersion; use describe for syntax';
   if(name==='agent_session')return 'join/resume require client; handoff is at most 8000 characters; sessionId routes follow-up calls';
@@ -1728,6 +1820,11 @@ export interface CadResult {
   cursor?: number;
   snapshot?: GraphSnapshot;
   renderJob?: StudioRenderJob;
+  videoJob?: StudioVideoJob;
+  /** A finished render_video: the MP4 artifact the bridge saved, plus a poster frame. */
+  video?: { mimeType: 'video/mp4'; path: string; uri: string; filename: string; byteLength: number; sha256: string;
+    width: number; height: number; fps: number; frames: number; seconds: number;
+    poster: { mimeType: 'image/png'; base64: string; width: number; height: number } };
   extraction?:{operationId:string;planToken:string;plan:Record<string,unknown>;equivalence?:Record<string,unknown>;retainedDocumentId?:string};
   analysisJob?:AnalysisJob;
 

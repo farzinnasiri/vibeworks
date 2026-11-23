@@ -185,7 +185,7 @@ export class RemoteRuntime implements RuntimeClient {
       if (!response.ok)
         throw new CadError(
           "BRIDGE_NOT_RUNNING",
-          `Bridge bootstrap returned HTTP ${response.status}. Start npm run headless.`,
+          `Bridge bootstrap returned HTTP ${response.status}. Start pnpm run headless.`,
         );
       this.connection = browserConnectionSchema.parse(await response.json());
       this.authorityId = this.connection.bridgeId;
@@ -442,6 +442,7 @@ export class RemoteRuntime implements RuntimeClient {
     return task;
   }
   private contextual(command: CadCommand): CadCommand {
+    if(command.type==='render_video'&&command.params.action!=='start')return command;
     if (
       command.type !== "documents" && command.type!=="agent_session" && command.type!=="activity" &&
       !("documentId" in command.params && command.params.documentId)
@@ -461,7 +462,7 @@ export class RemoteRuntime implements RuntimeClient {
       command = this.contextual(parseCommand(value));
       if (command.type === 'documents' && command.params.action === 'open') return this.navigate(command.params.documentId!);
       if (command.type === 'select_features') return this.selectLocal(command.params.featureIds);
-      if(command.type==='activity'||command.type==='agent_session'||command.type==='analyze_model')return this.send(command).then(o=>o.result);
+      if(command.type==='activity'||command.type==='agent_session'||command.type==='analyze_model'||command.type==='render_video')return this.send(command).then(o=>o.result);
       if (command.type === "inspect_model" && (command.params.replay || command.params.display || command.params.snapshot)) return this.replay(command).then(outcome => outcome.result);
     } catch (error) {
       return Promise.resolve(
@@ -470,7 +471,7 @@ export class RemoteRuntime implements RuntimeClient {
     }
     return this.enqueue(async () => {
       if (this.state.phase !== "ready")
-        return commandError(command.type, "RUNTIME_NOT_READY", "Node authority unavailable. Start npm run headless and wait for reconnection.");
+        return commandError(command.type, "RUNTIME_NOT_READY", "Node authority unavailable. Start pnpm run headless and wait for reconnection.");
       this.publish({ busy: true, activity: command.type });
       try {
         const generation = this.navigationGeneration;
@@ -513,6 +514,9 @@ export class RemoteRuntime implements RuntimeClient {
         this.publish({ busy: false, activity: "Ready" });
       }
     });
+  }
+  inspectDisplay(params: Extract<CadCommand,{type:'inspect_model'}>['params']): Promise<Outcome> {
+    return this.send(parseCommand({type:'inspect_model',params}) as Extract<CadCommand,{type:'inspect_model'}>, true);
   }
   preview(
     command: Extract<CadCommand, { type: "apply_edits" }>,

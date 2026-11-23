@@ -50,6 +50,7 @@ import {
 import { AnalysisCache, type AnalysisPart } from './analysis-cache';
 
 const MESH_OPTIONS = { tolerance: 0.05, angularTolerance: 0.15 };
+const RENDER_MESH_OPTIONS = { tolerance: 0.005, angularTolerance: 0.035 };
 type MeshOptions = typeof MESH_OPTIONS;
 const meshKey = (options: MeshOptions) => JSON.stringify(options);
 const meshValues = (mesh: DisplayMesh) => mesh.vertices.length + mesh.normals.length + mesh.triangles.length + mesh.lines.length + (mesh.faceRanges?.length??0) + (mesh.edgeRanges?.length??0);
@@ -1251,13 +1252,13 @@ export class GeometryEngine {
    * quality, so a quality that did not fit is ruled out by arithmetic, and a trial stops as soon as it is over budget.
    * Only the accepted quality's meshes are kept.
    */
-  private display(groups: Map<string, Piece[]>, detail: 'auto' | 'fine' | 'coarse', diagonal: number): Evaluation['meshes'] {
+  private display(groups: Map<string, Piece[]>, detail: 'auto' | 'fine' | 'coarse', diagonal: number, renderMesh=false): Evaluation['meshes'] {
     const coarse = {tolerance: snapTolerance(Math.max(0.5, diagonal / 2000)), angularTolerance: 0.4};
     const tolerance = snapTolerance(Math.max(MESH_OPTIONS.tolerance, diagonal / 10000));
     // Large models use the angular detail that fits the car display budget directly, avoiding a discarded fine trial.
     // Explicit Fine retains the original tolerances; small parts retain the original Auto profile too.
     const automatic = { tolerance, angularTolerance: tolerance >= 0.2 ? 0.25 : MESH_OPTIONS.angularTolerance };
-    const profiles = detail === 'fine' ? [MESH_OPTIONS] : detail === 'coarse' ? [coarse] :
+    const profiles = renderMesh ? [RENDER_MESH_OPTIONS] : detail === 'fine' ? [MESH_OPTIONS] : detail === 'coarse' ? [coarse] :
       [automatic, {tolerance: snapTolerance(Math.max(0.2, diagonal / 10000)), angularTolerance:0.25}, coarse];
     const entries = [...new Set([...groups.values()].flatMap(pieces => pieces.map(piece => piece.result)))];
     const placements = [...groups.values()].reduce((n, pieces) => n + pieces.length, 0);
@@ -1298,7 +1299,7 @@ export class GeometryEngine {
    * Builds exact results and, unless `meshes` is false, display meshes. An explicit display request fails when its
    * display does not fit; an implicit one (a commit or refresh) keeps the exact result and reports displayError.
    */
-  evaluate(value: CadDocument, documents: CadDocument[] = [], replay?: { step: number; key: string }, display?: Pick<DisplayRequest,'detail'|'step'|'featureIds'>, options: { meshes?: boolean } = {}): Evaluation {
+  evaluate(value: CadDocument, documents: CadDocument[] = [], replay?: { step: number; key: string }, display?: Pick<DisplayRequest,'detail'|'step'|'featureIds'>, options: { meshes?: boolean; renderMesh?: boolean } = {}): Evaluation {
     const started = performance.now();
     const fullGraph = assemblyGraph(value, documents);
     const document = fullGraph.at(-1)!;
@@ -1607,7 +1608,7 @@ export class GeometryEngine {
         } finally { placed.forEach(shape => shape.delete()); }
       }
       const diagonal = Math.hypot(...geometry.reduce((a,g)=>a.map((v,i)=>Math.max(v,g.bounds.size[i])),[0,0,0]));
-      meshes.push(...this.display(groups, display?.detail ?? 'auto', diagonal));
+      meshes.push(...this.display(groups, display?.detail ?? 'auto', diagonal,options.renderMesh));
       result.stats.display={requested:display?.detail??'auto',toleranceMm:this.meshOptions.tolerance,angularTolerance:this.meshOptions.angularTolerance,reduced:this.meshOptions.tolerance>MESH_OPTIONS.tolerance,values:displayValueCount(meshes),expandedValues:meshes.reduce((n,m)=>n+m.vertices.length+m.normals.length+m.triangles.length+m.lines.length,0),meshes:meshes.length};
       result.stats.cache={...result.stats.cache,evictions:commitEvaluation(),...this.cacheStats()};result.stats.durationMs=performance.now()-started;
       return { stats:result.stats,geometry, meshes, visibleFeatureIds: [...groups.keys()], references: result.references,
@@ -1632,7 +1633,7 @@ export class GeometryEngine {
       result.stats!.durationMs = performance.now() - started;
       return result;
     }
-    try { result.meshes = this.display(groups, display?.detail ?? 'auto', diagonal); }
+    try { result.meshes = this.display(groups, display?.detail ?? 'auto', diagonal,options.renderMesh); }
     catch (error) {
       if (display || !(error instanceof CadError) || error.code !== 'MODEL_TOO_COMPLEX') throw error;
       result.meshes = []; result.displayError = error.message;

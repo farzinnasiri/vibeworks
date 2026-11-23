@@ -18,6 +18,7 @@ import {
   type StorageOperation,
 } from "../shared/protocol";
 import { StudioJobs } from './studio-jobs';
+import { StudioVideoJobs } from './studio-video-jobs';
 import { HeadlessRenderer } from "./renderer";
 
 class SlotStore extends DocumentStore {
@@ -46,6 +47,8 @@ export class CommandAuthority {
   private analysisJobs:AnalysisJobs;
   private renderer = new HeadlessRenderer();
   private studioJobs = new StudioJobs();
+  private videoJobs = new StudioVideoJobs();
+  videoOutput(jobId:string){return this.videoJobs.output(jobId);}
   private slots: {
     runtime: CadRuntime;
     worker: NodeGeometryWorker;
@@ -107,7 +110,7 @@ export class CommandAuthority {
   ready() {
     return this.initialization;
   }
-  get canRestart(){return !this.jobs.length&&!this.running.size&&!this.studioJobs.busy;}
+  get canRestart(){return !this.jobs.length&&!this.running.size&&!this.studioJobs.busy&&!this.videoJobs.busy;}
   diagnostics() {
     return {
       authority: "node" as const,
@@ -146,6 +149,20 @@ export class CommandAuthority {
         if(command.params.expectedStorageVersion!==undefined && command.params.expectedStorageVersion!==graph.snapshot.storageVersion)
           throw new CadError('STORAGE_CONFLICT','Studio capture storage version differs from expectedStorageVersion. Inspect the model again.');
         return {result:this.studioJobs.startGraph(command.params,graph)};
+      } catch(error) {return {result:commandError(command.type,error instanceof CadError?error.code:'STUDIO_RENDER_FAILED',String(error))};}
+    })();
+    if (command.type === 'render_video') return (async () => {
+      try {
+        if(command.params.action !== 'start')return {result:this.videoJobs.control(command.params)};
+        const existing=this.videoJobs.existing(command.params);if(existing)return {result:existing};
+        this.videoJobs.checkCapacity();
+        const {graph}=await this.store.operation({action:'snapshot',documentId:command.params.documentId,snapshot:{}});
+        if(!graph)throw new CadError('SNAPSHOT_NOT_FOUND','Studio could not capture the committed document graph.');
+        if(command.params.expectedRevision!==undefined && command.params.expectedRevision!==graph.document.revision)
+          throw new CadError('REVISION_CONFLICT','Video capture revision differs from expectedRevision. Inspect the model again.');
+        if(command.params.expectedStorageVersion!==undefined && command.params.expectedStorageVersion!==graph.snapshot.storageVersion)
+          throw new CadError('STORAGE_CONFLICT','Video capture storage version differs from expectedStorageVersion. Inspect the model again.');
+        return {result:this.videoJobs.startGraph(command.params,graph)};
       } catch(error) {return {result:commandError(command.type,error instanceof CadError?error.code:'STUDIO_RENDER_FAILED',String(error))};}
     })();
     if (this.phase !== "ready")
@@ -387,6 +404,7 @@ export class CommandAuthority {
     await this.initialization;
     await this.renderer.close();
     await this.studioJobs.close();
+    await this.videoJobs.close();
     // Terminated native operations settle their runtime commands before the caller closes SQLite.
     while (this.running.size)
       await new Promise((resolve) => setTimeout(resolve, 5));

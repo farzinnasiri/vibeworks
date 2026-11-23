@@ -26,14 +26,14 @@ An empty project stays empty when copied. It receives no invented part or main a
 Run these against the intended bridge connection and registered session. First list the source project:
 
 ```sh
-npm run -s cad -- documents '{"action":"list","projectId":"11111111-1111-4111-8111-111111111111"}'
+pnpm --silent run cad documents '{"action":"list","projectId":"11111111-1111-4111-8111-111111111111"}'
 ```
 
 `projects[].version` is the project version. Each `documents[].storageVersion` belongs in the complete
 `documentVersions` map. A project version alone cannot detect changed parts or project membership.
 
 ```sh
-npm run -s cad -- documents '{"action":"duplicate_project","projectId":"11111111-1111-4111-8111-111111111111","name":"F1 blue","requestId":"22222222-2222-4222-8222-222222222222","expectedStorageVersion":2,"documentVersions":{"33333333-3333-4333-8333-333333333333":5,"44444444-4444-4444-8444-444444444444":3}}'
+pnpm --silent run cad documents '{"action":"duplicate_project","projectId":"11111111-1111-4111-8111-111111111111","name":"F1 blue","requestId":"22222222-2222-4222-8222-222222222222","expectedStorageVersion":2,"documentVersions":{"33333333-3333-4333-8333-333333333333":5,"44444444-4444-4444-8444-444444444444":3}}'
 ```
 
 Replace these example UUIDs and versions with the observed source identities. `name` is optional and
@@ -66,7 +66,7 @@ receipt includes a warning when any outside references remain shared. Listing do
 A single-document copy uses:
 
 ```sh
-npm run -s cad -- documents '{"action":"duplicate","documentId":"33333333-3333-4333-8333-333333333333","name":"Body blue","requestId":"55555555-5555-4555-8555-555555555555","expectedStorageVersion":5}'
+pnpm --silent run cad documents '{"action":"duplicate","documentId":"33333333-3333-4333-8333-333333333333","name":"Body blue","requestId":"55555555-5555-4555-8555-555555555555","expectedStorageVersion":5}'
 ```
 
 `projectId` optionally places the copy in another existing project. `expectedStorageVersion` is optional
@@ -112,7 +112,7 @@ The duplication suite uses MemoryStore, in-memory/temporary SQLite and the real 
 worker through CommandAuthority. It starts no HTTP server or browser and does not open the user's database.
 
 ```sh
-npx tsx --test tests/duplication.test.ts tests/cad-runtime.test.ts tests/projects.test.ts tests/validation.test.ts tests/round2-contract.test.ts tests/runtime-storage.test.ts
+pnpm exec tsx --test tests/duplication.test.ts tests/cad-runtime.test.ts tests/projects.test.ts tests/validation.test.ts tests/round2-contract.test.ts tests/runtime-storage.test.ts
 make typecheck
 ```
 

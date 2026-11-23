@@ -17,10 +17,10 @@ export interface StudioAssets {
   points: number[];
 }
 
-export async function buildStudioAssets(evaluation: Evaluation, active: () => boolean = () => true): Promise<StudioAssets | undefined> {
+export async function buildStudioAssets(evaluation: Evaluation, active: () => boolean = () => true, referenceBounds?: THREE.Box3): Promise<StudioAssets | undefined> {
   const visible = evaluation.meshes.filter(m => evaluation.visibleFeatureIds.includes(m.featureId));
   const raw = modelBounds(evaluation);
-  const bounds = new THREE.Box3(new THREE.Vector3(...raw.min), new THREE.Vector3(...raw.max));
+  const bounds = referenceBounds?.clone() ?? new THREE.Box3(new THREE.Vector3(...raw.min), new THREE.Vector3(...raw.max));
   const center = bounds.getCenter(new THREE.Vector3()), radius = Math.max(bounds.getBoundingSphere(new THREE.Sphere()).radius, 0.001);
   const unit = studioUnitMm(radius);
   const cache = new Map<number[], { solid: THREE.BufferGeometry; edges: THREE.BufferGeometry }>();

@@ -8,8 +8,8 @@ import { MAX_ARTIFACT_BYTES } from './validation.ts';
 
 export interface SavedArtifact { filename: string; path: string; uri: string; mimeType: string; byteLength: number; sha256: string }
 
-export async function saveArtifact(bytes: Buffer, filename: string, mimeType: string, directory = ARTIFACTS_DIR): Promise<SavedArtifact> {
-  if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,120}$/.test(filename) || basename(filename) !== filename || !bytes.length || bytes.length > MAX_ARTIFACT_BYTES) throw new Error('Artifact must have a safe basename and nonempty bytes within the export limit.');
+export async function saveArtifact(bytes: Buffer, filename: string, mimeType: string, directory = ARTIFACTS_DIR, maxBytes = MAX_ARTIFACT_BYTES): Promise<SavedArtifact> {
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,120}$/.test(filename) || basename(filename) !== filename || !bytes.length || bytes.length > maxBytes) throw new Error('Artifact must have a safe basename and nonempty bytes within the export limit.');
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const stat = await lstat(directory);
   if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error('The artifacts directory must be a real directory, not a symlink.');

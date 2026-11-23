@@ -56,7 +56,10 @@
   .studio-video-editor .studio-video-toolbar { gap: 8px; align-items: center; }
   .studio-video-heading { flex-wrap: wrap; gap: 2px 8px; flex: 1; }
   .studio-video-heading > span { font-size: 10px; }
-  .studio-video-editor .studio-video-toolbar-actions { gap: 4px; }
+  .studio-video-editor .studio-video-toolbar { flex-wrap: wrap; }
+  .studio-video-editor .studio-video-toolbar-actions { gap: 4px; flex-wrap: wrap; flex: 1 1 100%; }
+  .studio-video-editor .studio-video-edit-fields input,
+  .studio-video-editor .studio-video-edit-fields select { min-height: 44px; }
   .studio-video-editor .studio-video-shots li { flex-basis: 126px; }
   .studio-video-transport { flex-wrap: wrap; gap: 4px; }
   .studio-video-transport > output { min-width: 68px; }
@@ -70,3 +73,38 @@
   .studio-video-presets > button { flex-basis: 140px; }
   .studio-video-viewer:modal { inset: 8px; }
 }
+
+/* Preset drawings: the model as a box, the camera path as a line, its end as a dot. */
+.studio-video-glyph { flex: none; }
+.studio-video-glyph rect { fill: var(--sunken); stroke: var(--ink-2); stroke-width: 1.2; }
+.studio-video-glyph path { fill: none; stroke: var(--signal); stroke-width: 1.6; stroke-linecap: round; stroke-dasharray: 3 2.5; }
+.studio-video-glyph circle { fill: var(--signal); }
+.studio-video-presets > button:hover:not(:disabled) .studio-video-glyph path { animation: studio-video-path 1.2s linear infinite; }
+@keyframes studio-video-path { to { stroke-dashoffset: -11; } }
+
+/* Aspect choices draw their own frame. */
+.studio-video-aspect { display: inline-flex; align-items: center; gap: 6px; }
+.studio-video-aspect i { display: inline-block; border: 1.5px solid currentColor; border-radius: 2px; opacity: .7; }
+.studio-video-aspect[aria-pressed="true"] i { opacity: 1; background: color-mix(in srgb, currentColor 18%, transparent); }
+
+/* Keyframes sit on the scrubber, so the shape of the move is visible at a glance. */
+.studio-video-scrubber { position: relative; display: flex; align-items: center; flex: 1; min-width: 0; }
+.studio-video-scrubber input { width: 100%; }
+.studio-video-ticks { position: absolute; inset: 0 7px; pointer-events: none; }
+.studio-video-ticks i { position: absolute; top: 50%; width: 2px; height: 12px; margin: -6px 0 0 -1px; border-radius: 1px; background: var(--ink-3, #8a8d91); opacity: .55; }
+.studio-video-ticks i.active { background: var(--signal); opacity: 1; }
+
+.studio-video-saved { display: inline-flex; align-items: center; gap: 5px; margin-left: 10px; font-size: 10px; color: var(--ink-2); }
+.studio-video-saved::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3, #8a8d91); }
+.studio-video-saved.saved::before { background: #2f9e62; }
+.studio-video-saved.changed::before { background: var(--signal); }
+.studio-video-shot-picture img { object-fit: contain; }
+.studio-video-model-animation { display:flex; flex-wrap:wrap; align-items:end; gap:8px; border:0; border-top:1px solid var(--line); padding:8px 0; margin:8px 0; }
+.studio-video-model-animation > p { flex-basis:100%; font-size:11px; color:var(--ink-2); margin:0; }
+.studio-video-offset { display:flex; flex-wrap:wrap; gap:6px; align-items:end; flex-basis:100%; }
+.studio-video-offset > span { min-width:90px; font-size:11px; align-self:center; overflow-wrap:anywhere; }
+.studio-video-offset label { flex:1 1 65px; max-width:100px; }
+.studio-video-offset input { width:100%; min-height:32px; }
+
+@media (prefers-reduced-motion: reduce) { .studio-video-presets > button:hover:not(:disabled) .studio-video-glyph path { animation: none; } }
+.studio-video-scrubber input { accent-color: var(--ink); height: 28px; }

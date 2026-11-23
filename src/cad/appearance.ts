@@ -7,7 +7,7 @@ import type { Evaluation } from './types';
 /** Appearance can change density, but never the exact shape or declared geometric checks. */
 export function appearanceOnly(before: CadDocument, after: CadDocument): boolean {
   if(before.features.some(f=>f.surfaceStyles?.length||f.paintRegions?.length)||after.features.some(f=>f.surfaceStyles?.length||f.paintRegions?.length))return false;
-  const shape = (document: CadDocument) => ({ ...document, presentation: undefined, revision: 0, selectedFeatureIds: [],
+  const shape = (document: CadDocument) => ({ ...document, presentation: undefined, video: undefined, revision: 0, selectedFeatureIds: [],
     features: document.features.map(({ appearance: _appearance, ...feature }) => feature) });
   return JSON.stringify(shape(before)) === JSON.stringify(shape(after));
 }

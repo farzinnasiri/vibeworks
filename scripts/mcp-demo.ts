@@ -12,7 +12,7 @@ import { decodeBase64 } from '../src/bridge/validation.ts';
 
 const args = process.argv.slice(2);
 if (args.includes('--help')) {
-  console.log('Usage: npm run demo:mcp -- [--reset]\nRequires npm run dev and one real browser open at http://127.0.0.1:5173 with its kernel ready.\nWithout --reset, refuses an existing nonempty document. --reset backs up its JSON first.\nBuilds and checks the plate, edits thickness, exercises history/errors/JSON reload, saves PNG and exports.\nNo mock runtime or model-driven client session is launched.');
+  console.log('Usage: pnpm run demo:mcp [--reset]\nRequires pnpm run dev and one real browser open at http://127.0.0.1:5173 with its kernel ready.\nWithout --reset, refuses an existing nonempty document. --reset backs up its JSON first.\nBuilds and checks the plate, edits thickness, exercises history/errors/JSON reload, saves PNG and exports.\nNo mock runtime or model-driven client session is launched.');
   process.exit(0);
 }
 if (args.some((arg) => arg !== '--reset')) throw new Error('Unknown argument. Use --help.');

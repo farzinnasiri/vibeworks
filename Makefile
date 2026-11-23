@@ -19,22 +19,22 @@ help: ## List commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[1m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 install: ## Install the exact locked dependencies
-	npm ci
+	pnpm install --frozen-lockfile
 
 renderer-install: node_modules ## Install Chromium for images, GLB and browser checks (ARGS=--with-deps on Linux)
-	npm run renderer:install -- $(ARGS)
+	pnpm run renderer:install $(ARGS)
 
-node_modules: package-lock.json
-	npm ci
+node_modules: package.json pnpm-lock.yaml pnpm-workspace.yaml
+	pnpm install --frozen-lockfile
 	@touch node_modules
 
 dev: node_modules ## App at http://127.0.0.1:5173 + modeling bridge; Ctrl+C stops both
-	npm run dev
+	pnpm run dev
 
 dev-plain: dev ## Alias for make dev
 
 dev-web: node_modules ## Run only the web UI beside an existing headless service
-	npm run dev:web
+	pnpm run dev:web
 
 dev-portless: node_modules ## Optional: named HTTPS app URL through an existing portless installation
 	@command -v portless >/dev/null || { echo "Portless is optional. Install it separately or use make dev."; exit 1; }
@@ -58,34 +58,34 @@ url: ## Optional: print the app's portless URL
 check: typecheck test build ## Typecheck, unit/kernel tests and production build
 
 typecheck: node_modules ## TypeScript check
-	npm run typecheck
+	pnpm run typecheck
 
 test: node_modules ## Node tests (protocol, edits, parameters, real OCCT kernel)
-	npm test
+	pnpm test
 
 build: node_modules ## Typecheck and production bundle into dist/
-	npm run build
+	pnpm run build
 
 headless: node_modules ## Node geometry authority, SQLite and automatic output renderer; no human tab
-	npm run headless
+	pnpm run headless
 
 verify-headless: node_modules ## Verify the headless workflow in an isolated workspace
-	npm run verify:headless -- $(ARGS)
+	pnpm run verify:headless $(ARGS)
 
 demo: node_modules ## Acceptance plate over MCP against the Node authority (ARGS=--reset replaces its document)
-	npm run demo:mcp -- $(ARGS)
+	pnpm run demo:mcp $(ARGS)
 
 demo-mechanical: node_modules ## Bracket and shaft workflow over MCP (ARGS=--reset replaces its document)
-	npm run demo:mechanical -- $(ARGS)
+	pnpm run demo:mechanical $(ARGS)
 
 inspect: node_modules ## Show the connected document via the CLI (needs make headless or make dev)
-	@npm run -s cad -- inspect_model
+	@pnpm --silent run cad inspect_model
 
 doctor: node_modules ## Diagnose Node workers, renderer, queue and contract versions
-	@npm run -s cad -- doctor
+	@pnpm --silent run cad doctor
 
-tools: node_modules ## List the CLI/MCP tools; run one with: npm run -s cad -- <tool> '<json>' --latest
-	@npm run -s cad -- tools
+tools: node_modules ## List the CLI/MCP tools; run one with: pnpm --silent run cad <tool> '<json>' --latest
+	@pnpm --silent run cad tools
 
 mcp-config: ## Print session-only Codex/Claude launch commands with CAD tools approved
 	@echo "Claude Code (this session only):"

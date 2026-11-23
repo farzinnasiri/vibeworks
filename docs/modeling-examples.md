@@ -2,7 +2,7 @@
 
 Requests use the shared command catalog. Send each edit object to `apply_edits`, or wrap it as
 `{type:"apply_edits",params:...}` for the browser diagnostic API. Replace document IDs and revisions with
-current `inspect_model` results. CLI: `npm run cad -- apply_edits '<JSON params>'`. The examples create new
+current `inspect_model` results. CLI: `pnpm run cad apply_edits '<JSON params>'`. The examples create new
 features; use a fresh part so their IDs do not conflict. A failed request leaves the committed model intact.
 
 ## A smooth body through three sections

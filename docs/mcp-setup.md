@@ -61,7 +61,7 @@ an absolute executable path.
 
 This JSON is the common Claude-style `mcpServers` form. Clients with another configuration format need
 the same command and arguments. `make mcp-config` supplies the Codex invocation form. Avoid running the
-stdio adapter through `npm run`, whose startup banners can corrupt the protocol stream.
+stdio adapter through `pnpm run`, whose startup banners can corrupt the protocol stream.
 
 The adapter discovers the checkout's owner-only `.cad-local.json` connection receipt. Do not copy its token
 into MCP settings. If you use `VIBEWORKS_CONNECTION_FILE` for an isolated workspace, give the adapter the
@@ -96,18 +96,18 @@ passing design. Manufactured suitability and visual review remain separate judgm
 The CLI uses the same schemas and authority. It is useful for agents with shell access and for debugging.
 
 ```sh
-npm run -s cad -- tools
-npm run -s cad -- help apply_edits
-npm run -s cad -- schema apply_edits --kind box
-npm run -s cad -- agent_session '{"action":"join","client":"cli"}'
+pnpm --silent run cad tools
+pnpm --silent run cad help apply_edits
+pnpm --silent run cad schema apply_edits --kind box
+pnpm --silent run cad agent_session '{"action":"join","client":"cli"}'
 ```
 
 Copy `session.sessionId` from enrollment into later commands:
 
 ```sh
-npm run -s cad -- documents '{"action":"create","name":"Mounting plate"}' --session <session-uuid>
-npm run -s cad -- inspect_model --session <session-uuid>
-npm run -s cad -- describe '{"tool":"apply_edits","kind":"box"}' --session <session-uuid>
+pnpm --silent run cad documents '{"action":"create","name":"Mounting plate"}' --session <session-uuid>
+pnpm --silent run cad inspect_model --session <session-uuid>
+pnpm --silent run cad describe '{"tool":"apply_edits","kind":"box"}' --session <session-uuid>
 ```
 
 `--latest` resolves the connected client's document context for supported commands. Explicit document IDs

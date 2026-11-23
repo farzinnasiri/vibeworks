@@ -8,7 +8,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { AGENT_TOOLS, type CadDocument, type CadResult, type CommandName } from '../src/shared/protocol';
 import { ARTIFACTS_DIR, PROJECT_ROOT } from '../src/bridge/connection';
 
-if (!process.argv.includes('--reset')) throw new Error('Usage: npm run demo:mechanical -- --reset. Backs up and replaces the connected test document.');
+if (!process.argv.includes('--reset')) throw new Error('Usage: pnpm run demo:mechanical --reset. Backs up and replaces the connected test document.');
 await mkdir(ARTIFACTS_DIR, { recursive: true });
 const directory = await mkdtemp(join(ARTIFACTS_DIR, 'mechanical-'));
 const client = new Client({ name: 'mechanical-browser-acceptance', version: '1.0.0' });

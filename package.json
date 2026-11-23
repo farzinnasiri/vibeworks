@@ -7,13 +7,13 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "concurrently -k -n bridge,web \"npm:dev:bridge\" \"npm:dev:web\"",
+    "dev": "concurrently -k -n bridge,web \"pnpm run dev:bridge\" \"pnpm run dev:web\"",
     "dev:web": "vite --host 127.0.0.1",
     "dev:bridge": "tsx src/bridge/server.ts",
     "mcp": "tsx src/bridge/mcp.ts",
     "cad": "tsx src/bridge/cli.ts",
     "typecheck": "tsc --noEmit",
-    "build": "npm run typecheck && vite build",
+    "build": "pnpm run typecheck && vite build",
     "preview": "vite preview",
     "test": "tsx --test --test-concurrency=1 tests/*.test.ts",
     "demo:mcp": "tsx scripts/mcp-demo.ts",
@@ -61,5 +61,6 @@
   "homepage": "https://github.com/farzinnasiri/vibeworks#readme",
   "bugs": {
     "url": "https://github.com/farzinnasiri/vibeworks/issues"
-  }
+  },
+  "packageManager": "pnpm@12.16.1"
 }

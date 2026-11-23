@@ -695,6 +695,7 @@ export class CadRuntime {
         delete candidate.parameters;
         delete candidate.analysis;
         delete candidate.presentation;
+        delete candidate.video;
       } else if (action === 'load') {
         if (!document)
           throw new CadError('INVALID_ARGUMENT', 'The load action requires a schema-version-1 document.');
@@ -711,6 +712,8 @@ export class CadRuntime {
         else delete candidate.analysis;
         if (loaded.presentation) candidate.presentation = loaded.presentation;
         else delete candidate.presentation;
+        if (loaded.video) candidate.video = loaded.video;
+        else delete candidate.video;
         resolveBindings(candidate);
       } else {
         const snapshot = action === 'undo' ? session.undo.at(-1) : session.redo.at(-1);
@@ -725,6 +728,8 @@ export class CadRuntime {
         else delete candidate.analysis;
         if (snapshot.presentation) candidate.presentation = structuredClone(snapshot.presentation);
         else delete candidate.presentation;
+        if (snapshot.video) candidate.video = structuredClone(snapshot.video);
+        else delete candidate.video;
         candidate.selectedFeatureIds = [...snapshot.selectedFeatureIds];
         history = action === 'undo' ? 'undo' : 'redo';
       }
@@ -1008,7 +1013,7 @@ export class CadRuntime {
         params.featureId?{expectedRevision:baseline.document.revision,expectedStorageVersion:baseline.snapshot.storageVersion,featureIds:[params.featureId]}:undefined,
         undefined,{meshes:true});}
       finally{if(this.timings)this.timings.geometryEvaluationMs+=performance.now()-started;}
-      beforeDocument={...baseline.document,presentation:session.document.presentation};
+      beforeDocument={...baseline.document,presentation:session.document.presentation,video:session.document.video};
       const prior=reviewTotals(before,params.featureId);
       review.comparison={snapshotId:baseline.snapshot.snapshotId,revision:baseline.document.revision,before:prior,
         sizeDeltaMm:totals.size.map((n,i)=>n-prior.size[i]) as import('../shared/protocol').Vector3,
@@ -1427,6 +1432,8 @@ export class CadRuntime {
 
 /** UI dependency is deliberately limited to client commands and projected display state. */
 export type RuntimeClient = Pick<CadRuntime, 'subscribe' | 'getSnapshot' | 'initialize' | 'retryInitialization' | 'execute' | 'preview' | 'replay' | 'refreshStorage' | 'select' | 'openDocument'> & {
+  /** Read-only captured display for Studio; does not replace the live document or workbench projection. */
+  inspectDisplay?: (params: Extract<CadCommand,{type:'inspect_model'}>['params']) => Promise<Outcome>;
   manualHistoryTarget?:(action:'undo'|'redo')=>{documentId:string;name:string;revision:number;storageVersion:number;label:string}|undefined;
   manualHistoryAction?:(action:'undo'|'redo')=>Promise<CadResult>;
   acknowledgeWorkspaceView?: (requestId:string,error?:string)=>Promise<void>;

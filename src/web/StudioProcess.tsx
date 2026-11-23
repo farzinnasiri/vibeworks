@@ -4,6 +4,7 @@ import { ProgressMeter } from './ProgressMeter';
 export interface StudioProcessState {
   kind: 'image' | 'video' | 'preview';
   phase: 'idle' | 'preparing' | 'compiling' | 'rendering' | 'finishing' | 'encoding' | 'error';
+  errorCode?:string;
   title: string;
   detail: string;
   value?: number;
@@ -17,7 +18,7 @@ export interface StudioProcessState {
 export function StudioProcess({ state, thumbnail }: { state: StudioProcessState; thumbnail: RefObject<HTMLCanvasElement | null> }) {
   const busy = state.phase !== 'idle' && state.phase !== 'error';
   if (!busy && state.phase !== 'error') return <span className="sr-only" role="status">{state.title}</span>;
-  return <section className={`studio-process ${busy ? 'working' : ''} ${state.phase === 'error' ? 'failed' : ''}`} aria-label="Studio process" aria-busy={busy}>
+  return <section className={`studio-process ${busy ? 'working' : ''} ${state.phase === 'error' ? 'failed' : ''}`} aria-label="Studio process" aria-busy={busy} data-state={state.phase} data-error-code={state.errorCode}>
     <div className="studio-process-head">
       <div className="studio-process-frame" aria-hidden="true">
         <canvas ref={thumbnail} width={96} height={60} hidden={!busy || !state.thumbnail} />

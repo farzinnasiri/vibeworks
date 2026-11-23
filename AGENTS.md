@@ -36,3 +36,11 @@ actually ran. Tests, a build, rendered images and live agent operation are diffe
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for checks and pull requests, and
 [docs/architecture.md](docs/architecture.md) for the decisions changes must preserve.
+
+## Package manager
+
+Use pnpm 12.16.1, pinned in `package.json`. Run `make install` to install the
+locked dependencies with `pnpm install --frozen-lockfile`. Commit `pnpm-lock.yaml`
+when changing dependencies. Keep each package root independent; pnpm shares package
+contents through its global store. Do not commit `node_modules` or create npm/yarn
+lockfiles. Dependency build permissions live in `pnpm-workspace.yaml`.

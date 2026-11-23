@@ -61,7 +61,7 @@ export class GeometryWorkerSession {
       else {
         // Exports and agent commands need exact results only; display meshes are made when a viewer asks.
         const meshes = request.type === 'evaluate' && request.meshes !== false;
-        const evaluation = engine.evaluate(request.document, request.documents, request.type === 'evaluate' ? request.replay : undefined, request.type === 'evaluate' ? request.display : undefined, { meshes });
+        const evaluation = engine.evaluate(request.document, request.documents, request.type === 'evaluate' ? request.replay : undefined, request.type === 'evaluate' ? request.display : undefined, { meshes, renderMesh:request.type==='evaluate'&&request.renderMesh });
         if (request.type === 'export') value = await engine.export(request.format, request.featureIds, request.document);
         else {
           value = request.analyze ? { ...evaluation, analysis: engine.analyze(request.document, evaluation.geometry, request.analyze.featureIds, analysisBudget(deadline), Math.max(0, deadline - performance.now() - REPLY_RESERVE_MS), request.analyze.control, event=>this.emit?.(request.id,event)) } : evaluation;

@@ -4,10 +4,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { StudioVideoEncoding } from '../shared/protocol';
 
-const MAX_OUTPUT = 64 * 1024 * 1024;
-export const MAX_VIDEO_FRAME = 16 * 1024 * 1024;
+export const MAX_VIDEO_OUTPUT = 256 * 1024 * 1024;
+const MAX_OUTPUT = MAX_VIDEO_OUTPUT;
+/** A 4K PNG frame of a detailed scene stays well inside this. */
+export const MAX_VIDEO_FRAME = 48 * 1024 * 1024;
 export class VideoEncodingError extends Error {
-  constructor(readonly status: number, message: string) { super(message); }
+  constructor(readonly status: number, message: string, readonly code = 'VIDEO_ENCODING_FAILED') { super(message); }
 }
 interface Encoding {
   spec: StudioVideoEncoding; directory: string; output: string; child: ChildProcessWithoutNullStreams;
@@ -22,6 +24,7 @@ export class StudioVideoEncoder {
   private starting?: Promise<{ id: string; frames: number }>;
   private startingId?: string;
   private closed = false;
+  private expired = new Map<string,VideoEncodingError>();
   constructor(private executable = 'ffmpeg', private deadlineMs = 30 * 60_000) {}
 
   start(spec: StudioVideoEncoding) {
@@ -38,9 +41,12 @@ export class StudioVideoEncoder {
   private async create(spec: StudioVideoEncoding) {
     const directory = await mkdtemp(join(tmpdir(), 'vibeworks-video-'));
     const output = join(directory, 'video.mp4');
+    // High spends more bits and time; both use adaptive quantization, which keeps dark studio gradients from banding.
+    const high = spec.quality === 'high';
     const child = spawn(this.executable, ['-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
       '-f', 'image2pipe', '-vcodec', 'png', '-framerate', String(spec.fps), '-i', 'pipe:0', '-an',
-      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p',
+      '-c:v', 'libx264', '-preset', high ? 'slow' : 'fast', '-crf', high ? '14' : '18', '-x264-params', 'aq-mode=3',
+      '-g', String(spec.fps * 2), '-pix_fmt', 'yuv420p',
       '-frames:v', String(spec.frames), '-movflags', '+faststart', '-fs', String(MAX_OUTPUT + 1024 * 1024), output],
       { stdio: ['pipe', 'pipe', 'pipe'] });
     const done = new Promise<{ code: number | null; error?: Error }>(resolve => {
@@ -49,7 +55,11 @@ export class StudioVideoEncoder {
     });
     child.stdin.on('error', () => {}); child.stdout.resume();
     const job: Encoding = { spec: structuredClone(spec), directory, output, child, done, frames: 0, writing: false, finishing: false,
-      timer: setTimeout(() => { void this.cancel(spec.id); }, this.deadlineMs), stopped: false, stderr: '' };
+      timer: setTimeout(() => {
+        this.expired.set(spec.id,new VideoEncodingError(410,'Video exceeded its render budget. Use a shorter sequence or lower resolution.','VIDEO_BUDGET_EXCEEDED'));
+        while(this.expired.size>8)this.expired.delete(this.expired.keys().next().value!);
+        void this.cancel(spec.id);
+      }, this.deadlineMs), stopped: false, stderr: '' };
     job.timer.unref();
     child.stderr.on('data', chunk => { job.stderr = (job.stderr + chunk.toString()).slice(-2000); });
     this.active = job;
@@ -63,6 +73,7 @@ export class StudioVideoEncoder {
     }
   }
   private require(id: string) {
+    const expired=this.expired.get(id);if(expired)throw expired;
     const job = this.active;
     if (!job || job.spec.id !== id || job.stopped) throw new VideoEncodingError(404, 'Video job is absent, cancelled or expired. Render again.');
     return job;
@@ -73,7 +84,7 @@ export class StudioVideoEncoder {
       throw new VideoEncodingError(409, 'Send video frames once, in order, before finishing.');
     if (png.length < 33 || png.length > MAX_VIDEO_FRAME || png.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a' || png.toString('ascii', 12, 16) !== 'IHDR'
       || png.readUInt32BE(16) !== job.spec.width || png.readUInt32BE(20) !== job.spec.height)
-      throw new VideoEncodingError(400, 'Frame must be a PNG with the chosen video dimensions, at most 16 MiB.');
+      throw new VideoEncodingError(400, 'Frame must be a PNG with the chosen video dimensions, at most 48 MiB.');
     job.writing = true;
     try {
       await new Promise<void>((resolve, reject) => job.child.stdin.write(png, error => error ? reject(error) : resolve()));
@@ -82,7 +93,7 @@ export class StudioVideoEncoder {
       return { id, frames: job.frames };
     } catch {
       await this.cancel(id);
-      throw new VideoEncodingError(422, 'FFmpeg stopped accepting frames. Render again.');
+      throw this.expired.get(id)??new VideoEncodingError(422, 'FFmpeg stopped accepting frames. Render again.');
     } finally { job.writing = false; }
   }
   async finish(id: string): Promise<Buffer> {
@@ -91,10 +102,10 @@ export class StudioVideoEncoder {
     job.finishing = true; job.child.stdin.end();
     try {
       const result = await job.done;
-      if (job.stopped) throw new VideoEncodingError(410, 'Video was cancelled or exceeded its 30-minute budget.');
+      if (job.stopped) throw this.expired.get(id)??new VideoEncodingError(410, 'Video was cancelled.','VIDEO_CANCELLED');
       if (result.code !== 0 || result.error) throw new VideoEncodingError(422, `FFmpeg could not encode this video. ${job.stderr.slice(-500)}`);
       const size = (await stat(job.output)).size;
-      if (size > MAX_OUTPUT || size < 32) throw new VideoEncodingError(413, 'Video exceeds its 64 MiB output budget. Use a shorter sequence.');
+      if (size > MAX_OUTPUT || size < 32) throw new VideoEncodingError(413, 'Video exceeds its 256 MiB output budget. Use a shorter sequence, a lower resolution or standard quality.');
       return await readFile(job.output);
     } finally { await this.cancel(id); }
   }

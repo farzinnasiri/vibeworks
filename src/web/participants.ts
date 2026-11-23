@@ -59,7 +59,7 @@ export function participantStatus(participant: Participant): { label: string; to
 
 const commandNames: Record<string, string> = {
   apply_edits: 'edit', select_features: 'selection', inspect_model: 'inspection', analyze_model: 'analysis',
-  documents: 'document request', render_views: 'render', render_image: 'image render', export_model: 'export',
+  documents: 'document request', render_views: 'render', render_image: 'image render', render_video: 'video render', export_model: 'export',
   document_action: 'document action', workspace_view: 'workspace view', describe: 'description', activity: 'activity read',
 };
 export const commandName = (operation: string) => commandNames[operation] ?? operation.replaceAll('_', ' ');

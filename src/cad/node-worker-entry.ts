@@ -21,7 +21,7 @@ const session = new GeometryWorkerSession(
       if (metadata.version !== "1.1.0")
         throw new CadError(
           "KERNEL_VERSION_MISMATCH",
-          `Expected ${name}@1.1.0, installed ${metadata.version}. Run npm ci for the matched kernel.`,
+          `Expected ${name}@1.1.0, installed ${metadata.version}. Run pnpm install --frozen-lockfile for the matched kernel.`,
         );
     }
     // Resolve the WASM beside the matched JS package, independent of cwd and bundler URLs.

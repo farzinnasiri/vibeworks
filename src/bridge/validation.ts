@@ -1,4 +1,4 @@
-import { renderedTileSchema,reviewEvidenceSchema,renderedPNGSchema,workspaceViewResultSchema, studioRenderJobSchema, projectDuplicationSchema, agentSchema, agentSessionSchema, participantSchema, activityOperationSchema, graphSnapshotSchema } from '../shared/protocol';
+import { renderedTileSchema,reviewEvidenceSchema,renderedPNGSchema,workspaceViewResultSchema, studioRenderJobSchema, studioVideoJobSchema, projectDuplicationSchema, agentSchema, agentSessionSchema, participantSchema, activityOperationSchema, graphSnapshotSchema } from '../shared/protocol';
 import {ASSET_ENCODING,decodeAssets,displayValueCount} from '../shared/display';
 import { z } from 'zod';
 import { replaySchema, MAX_ASSEMBLY_FEATURES, displayMeshSchema, resolvedMountSchema, documentSummarySchema, projectSchema, revisionSummarySchema, MAX_FEATURES, MAX_REFERENCED_DOCUMENTS, appearanceSchema, commandFailureSchema, commandSchemas, documentSchema, featureIdSchema, MAX_RENDER_VIEWS, TARGET_EXPECTATIONS, type CadResult } from '../shared/protocol.ts';
@@ -28,7 +28,10 @@ export const resultSchema: z.ZodType<CadResult> = z.object({
   inspection:z.record(z.string(),z.unknown()).optional(),
   actor:z.object({agentId:z.string().uuid(),sessionId:z.string().uuid(),clientInstanceId:z.string().uuid().optional()}).strict().optional(),
   help:z.object({tool:z.string(),kind:z.string().optional(),schema:z.record(z.string(),z.unknown()),example:z.record(z.string(),z.unknown()),notes:z.array(z.string())}).strict().optional(),removedChecks:ids.optional(),
-  replay: replaySchema.optional(), renderJob: studioRenderJobSchema.optional(),
+  replay: replaySchema.optional(), renderJob: studioRenderJobSchema.optional(), videoJob: studioVideoJobSchema.optional(),
+  video:z.object({mimeType:z.literal('video/mp4'),path:z.string(),uri:z.string(),filename:z.string(),byteLength:z.number().int().positive(),sha256:z.string().regex(/^[a-f0-9]{64}$/),
+    width:z.number().int().positive(),height:z.number().int().positive(),fps:z.number().int().positive(),frames:z.number().int().positive(),seconds:z.number().positive(),
+    poster:z.object({mimeType:z.literal('image/png'),base64:z.string(),width:z.number().int().positive(),height:z.number().int().positive()}).strict()}).strict().optional(),
   agent:agentSchema.optional(),session:agentSessionSchema.optional(),sessions:z.array(agentSessionSchema).max(100).optional(),participants:z.array(participantSchema).max(1000).optional(),operations:z.array(activityOperationSchema).max(100).optional(),cursor:z.number().int().nonnegative().optional(),snapshot:graphSnapshotSchema.optional(),
   operation: commandName,
   status: z.enum(['success', 'error']),

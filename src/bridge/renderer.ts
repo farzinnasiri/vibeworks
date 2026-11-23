@@ -94,7 +94,7 @@ export class HeadlessRenderer {
       const missing = /Executable doesn't exist|browser.*not found/i.test(String(error));
       throw new CadError(
         missing ? 'RENDERER_DEPENDENCY' : 'RENDERER_FAILED',
-        (missing ? 'Install the pinned Chromium with npm run renderer:install. ' : 'Renderer initialization failed. Retry rendering to start a fresh browser. ') + String(error),
+        (missing ? 'Install the pinned Chromium with pnpm run renderer:install. ' : 'Renderer initialization failed. Retry rendering to start a fresh browser. ') + String(error),
       );
     }
   }

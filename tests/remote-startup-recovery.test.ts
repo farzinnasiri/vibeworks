@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
 import { emptyDocument } from '../src/cad/document';
 import { modelHealth } from '../src/cad/health';
-import { ENGINE_VERSION, LEGACY_PROJECT_ID, type CadCommand, type CadDocument } from '../src/shared/protocol';
+import { ENGINE_VERSION, LEGACY_PROJECT_ID, parseCommand, type CadCommand, type CadDocument } from '../src/shared/protocol';
 
 async function fixture(t: TestContext, options: { timeout?: boolean; offline?: boolean; stale?: boolean; remembered?: boolean; deferred?: boolean; largeAssembly?: boolean; prepared?: boolean; changedPreparation?: boolean } = {}) {
   (globalThis as any).__VIBEWORKS_FINGERPRINT__ = 'startup-test';
@@ -84,6 +84,17 @@ test('large assembly loading skips source preparation when the complete current 
   await f.runtime.initialize();
   assert.equal((await f.runtime.openDocument(f.saved.documentId)).status, 'success');
   assert.ok(!f.commands.some(command => command.type === 'inspect_model' && command.params.display));
+});
+
+test('video job controls keep their job-scoped schema when a document is open',async t=>{
+  const f=await fixture(t);await f.runtime.initialize();await f.runtime.openDocument(f.saved.documentId);
+  for(const action of ['status','result','cancel'] as const){
+    const jobId=crypto.randomUUID();await f.runtime.execute({type:'render_video',params:{action,jobId}});
+    const command=f.commands.at(-1)!;
+    assert.equal(command.type,'render_video');
+    assert.deepEqual(command.params,{action,jobId},'document context must never leak into job controls');
+    assert.doesNotThrow(()=>parseCommand(command));
+  }
 });
 
 test('a graph changed during source preparation cannot become a successfully loaded display', async t => {

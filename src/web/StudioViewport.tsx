@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { Evaluation } from '../cad/types';
-import { VIEW_DIRECTIONS, type ViewName, type Presentation, type StudioVideoCamera } from '../shared/protocol';
+import { VIEW_DIRECTIONS, type ViewName, type Presentation, type StudioVideoCamera, type StudioVideoAnimation } from '../shared/protocol';
+import { animateStudioModel } from './studio-video-animation';
 import { imageQuality, imageFrame, imagePixels, type ImageOutput } from '../shared/studio';
 import { configureStudioRenderer } from './scene';
 import { changeStudioLens, fitStudioCamera, matchStudioProjection, resizeStudioCamera, studioLensFov } from './studio-camera';
@@ -31,6 +32,8 @@ export interface StudioView {
   savePreview: () => void;
   captureVideo: () => StudioVideoCamera | undefined;
   previewVideo: (shot: StudioVideoCamera) => void;
+  previewVideoModel?: (evaluation?: Evaluation) => Promise<void>;
+  animateVideo?: (animation: StudioVideoAnimation | undefined, progress: number) => void;
   /** A small raster picture of the current camera with other scene settings, for choosing a look. */
   thumbnail: (settings: Presentation, width: number, height: number, signal: AbortSignal) => Promise<Blob>;
 }
@@ -39,8 +42,10 @@ export type JobState = { phase: 'idle' } | { phase: 'running'; status: RenderSta
 
 
 /** A display-only photographic camera over the same Node-produced meshes as the workbench. */
-export function StudioViewport({ evaluation, identity, documentId, revision, settings, output, projection, focalLengthMm, navigation, api, onPreview, onJob, onRendered, onInteraction, onProjection, onLens, onShowingImage, progressThumb, highlightFeatures, onPickFeature, onCameraAzimuth, rememberCamera = true }: {
+export function StudioViewport({ evaluation, identity, documentId, revision, settings, output, projection, focalLengthMm, navigation, api, onPreview, onJob, onRendered, onInteraction, onProjection, onLens, onShowingImage, progressThumb, highlightFeatures, onPickFeature, onCameraAzimuth, rememberCamera = true, frameSize }: {
   evaluation: Evaluation; identity: string; documentId: string; revision: number; settings: Presentation; output: ImageOutput;
+  /** Video output size: overrides the image size for the frame guide and video camera capture. */
+  frameSize?: { width: number; height: number };
   projection: 'perspective' | 'orthographic'; focalLengthMm: number; navigation: StudioNavigation; api: React.RefObject<StudioView | null>;
   onPreview: (state: PreviewState) => void; onJob: (state: JobState) => void;
   onRendered: (render: Omit<StudioRender, 'id' | 'url'>) => StudioRender | Promise<StudioRender>; onInteraction: () => void;
@@ -57,8 +62,8 @@ export function StudioViewport({ evaluation, identity, documentId, revision, set
   rememberCamera?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null);
-  const live = useRef({ settings, output, projection, focalLengthMm, navigation, revision, documentId, onPreview, onJob, onRendered, onInteraction, onProjection, onLens, onShowingImage, highlightFeatures, onPickFeature, onCameraAzimuth, rememberCamera });
-  live.current = { settings, output, projection, focalLengthMm, navigation, revision, documentId, onPreview, onJob, onRendered, onInteraction, onProjection, onLens, onShowingImage, highlightFeatures, onPickFeature, onCameraAzimuth, rememberCamera };
+  const live = useRef({ frameSize, settings, output, projection, focalLengthMm, navigation, revision, documentId, onPreview, onJob, onRendered, onInteraction, onProjection, onLens, onShowingImage, highlightFeatures, onPickFeature, onCameraAzimuth, rememberCamera });
+  live.current = { frameSize, settings, output, projection, focalLengthMm, navigation, revision, documentId, onPreview, onJob, onRendered, onInteraction, onProjection, onLens, onShowingImage, highlightFeatures, onPickFeature, onCameraAzimuth, rememberCamera };
   const engine = useRef<{ restage: () => void; projection: () => void; lens: () => void; frame: () => void; highlight: () => void; floor: () => void } | null>(null);
   const tracer = useRef<StudioRenderer | null>(null);
   const job = useRef<{ abort: AbortController; view: number } | null>(null);
@@ -104,6 +109,8 @@ export function StudioViewport({ evaluation, identity, documentId, revision, set
     const controls = new OrbitControls(camera, renderer.domElement);
     configureStudioNavigation(controls, 1);
     let assets: StudioAssets | undefined, scene: THREE.Scene | undefined, thumbnails: StudioVideoPreviewRenderer | undefined;
+    let baseAssets: StudioAssets | undefined, modelTicket=0, videoAnimation: StudioVideoAnimation|undefined, videoProgress=0;
+    const retiredAssets=new Set<StudioAssets>();
     let stop = false, staging = 0, idle = 0;
     const draw = () => { if (scene && !stop) renderer.render(scene, camera); };
     /**
@@ -136,8 +143,9 @@ export function StudioViewport({ evaluation, identity, documentId, revision, set
     let rememberTimer = 0;
     const remember = () => { clearTimeout(rememberTimer); if (assets && live.current.rememberCamera) writeStudioCamera(live.current.documentId, shotOf()); };
     const size = () => ({ width: Math.max(element.clientWidth, 1), height: Math.max(element.clientHeight, 1) });
+    const framePixels = (viewport: { width: number; height: number }) => live.current.frameSize ?? imagePixels(live.current.output, viewport, window.devicePixelRatio);
     const updateFrame = () => {
-      const viewport = size(), pixels = imagePixels(live.current.output, viewport, window.devicePixelRatio);
+      const viewport = size(), pixels = framePixels(viewport);
       const rect = imageFrame(viewport, pixels);
       setFrame({ ...rect, guide: Math.abs(rect.width - viewport.width) > 1 || Math.abs(rect.height - viewport.height) > 1 });
     };
@@ -145,7 +153,7 @@ export function StudioViewport({ evaluation, identity, documentId, revision, set
       if (!assets || assets.points.length < 3) return;
       const { width, height } = size(), bounds = new THREE.Box3(assets.bounds.min.clone().sub(assets.center).divideScalar(assets.unit), assets.bounds.max.clone().sub(assets.center).divideScalar(assets.unit));
       const direction = camera.position.clone().sub(controls.target).normalize();
-      const viewport = { width, height }, image = imagePixels(live.current.output, viewport, window.devicePixelRatio);
+      const viewport = { width, height }, image = framePixels(viewport);
       const shot = fitStudioCamera(live.current.projection, direction.toArray(), assets.points, bounds, viewport, image, live.current.focalLengthMm);
       if (shot.camera instanceof THREE.PerspectiveCamera) perspective.copy(shot.camera); else orthographic.copy(shot.camera);
       camera = live.current.projection === 'perspective' ? perspective : orthographic; controls.object = camera;
@@ -176,16 +184,18 @@ export function StudioViewport({ evaluation, identity, documentId, revision, set
       void loadStudioLook(settings, assets.radius).then(look => {
         if (stop || ticket !== staging || !assets) return;
         const next = composeStudioScene(assets, settings, look, 'preview');
+        animateStudioModel(next,videoAnimation,videoProgress);
         configureStudioRenderer(renderer, settings);
         const old = scene; scene = next; highlight(); draw();
         if (old) releaseStudioScene(old);
+        for(const retired of retiredAssets)if(retired!==assets&&retired!==baseAssets){disposeStudioAssets(retired);retiredAssets.delete(retired);}
         live.current.onPreview({ phase: 'ready' });
       }).catch(error => { if (!stop && ticket === staging) { setError(String(error)); live.current.onPreview({ phase: 'error', message: String(error) }); } });
     };
     live.current.onPreview({ phase: 'loading' });
     void buildStudioAssets(evaluation, () => !stop).then(built => {
       if (!built || stop) { if (built) disposeStudioAssets(built); return; }
-      assets = built; configureStudioNavigation(controls, assets.radius / assets.unit);
+      assets = baseAssets = built; configureStudioNavigation(controls, assets.radius / assets.unit);
       const savedShot = live.current.rememberCamera ? readStudioCamera(live.current.documentId) : undefined;
       if (savedShot) restoreShot(savedShot); else fit();
       restage();
@@ -199,7 +209,7 @@ export function StudioViewport({ evaluation, identity, documentId, revision, set
       camera = next; controls.object = next; controls.update(); moved();
     };
     const changeLens = () => {
-      const viewport = size(), image = imagePixels(live.current.output, viewport, window.devicePixelRatio);
+      const viewport = size(), image = framePixels(viewport);
       changeStudioLens(perspective, controls.target, studioLensFov(live.current.focalLengthMm, viewport, image));
       controls.update(); moved();
     };
@@ -208,7 +218,7 @@ export function StudioViewport({ evaluation, identity, documentId, revision, set
       const { width, height } = size(), scale = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(4.2e6 / (width * height)));
       renderer.setSize(Math.round(width * scale), Math.round(height * scale), false);
       const nextSize = { width, height };
-      const image = live.current.output.size === 'viewport' ? undefined : imagePixels(live.current.output, nextSize, window.devicePixelRatio);
+      const image = live.current.output.size === 'viewport' && !live.current.frameSize ? undefined : framePixels(nextSize);
       resizeStudioCamera(perspective, previousSize, nextSize, image);
       resizeStudioCamera(orthographic, previousSize, nextSize, image);
       previousSize = nextSize;
@@ -322,6 +332,16 @@ export function StudioViewport({ evaluation, identity, documentId, revision, set
       moved();
     }
     api.current = {
+      previewVideoModel: async value => {
+        if(!baseAssets)return;
+        const ticket=++modelTicket;
+        const next=value?await buildStudioAssets(value,()=>!stop&&ticket===modelTicket,baseAssets.bounds):baseAssets;
+        if(!next)return;
+        if(stop||ticket!==modelTicket){if(next!==baseAssets)disposeStudioAssets(next);return;}
+        if(assets&&assets!==baseAssets)retiredAssets.add(assets);
+        assets=next;restage();
+      },
+      animateVideo: (animation,progress)=>{videoAnimation=animation;videoProgress=progress;if(scene){animateStudioModel(scene,animation,progress);draw();}},
       present: (shot,evaluation) => {
         if(!assets)throw new Error('Studio geometry is not ready.');
         const framed=shotFrame(evaluation,shot),viewport=size();
@@ -352,14 +372,14 @@ export function StudioViewport({ evaluation, identity, documentId, revision, set
       resumePreview: () => { imageLocked.current = false; setOverlay(undefined);  },
       captureVideo: () => {
         if (!assets || camera !== perspective) return undefined;
-        const viewport = size(), rect = imageFrame(viewport, { width: 1920, height: 1080 });
+        const viewport = size(), rect = imageFrame(viewport, live.current.frameSize ?? { width: 1920, height: 1080 });
         const shot = shotOf();
         return { position: shot.position, target: shot.target, focalLengthMm: live.current.focalLengthMm,
           fov: THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(perspective.fov) / 2) * rect.height / viewport.height / perspective.zoom)) };
       },
       previewVideo: shot => {
         if (!assets) return;
-        const viewport = size(), rect = imageFrame(viewport, { width: 1920, height: 1080 });
+        const viewport = size(), rect = imageFrame(viewport, live.current.frameSize ?? { width: 1920, height: 1080 });
         camera = perspective; controls.object = camera;
         perspective.position.fromArray(shot.position).sub(assets.center).divideScalar(assets.unit);
         controls.target.fromArray(shot.target).sub(assets.center).divideScalar(assets.unit);
@@ -400,7 +420,7 @@ export function StudioViewport({ evaluation, identity, documentId, revision, set
       controls.removeEventListener('start', begin); controls.removeEventListener('end', end); controls.removeEventListener('change', moved); controls.dispose();
       renderer.domElement.removeEventListener('webglcontextlost', lost); api.current = null; engine.current = null;
       if (scene) releaseStudioScene(scene);
-      if (assets) disposeStudioAssets(assets);
+      for(const owned of new Set([assets,baseAssets,...retiredAssets]))if(owned)disposeStudioAssets(owned);
       renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
     };
   // A new evaluation always arrives with a new identity.
@@ -415,7 +435,7 @@ export function StudioViewport({ evaluation, identity, documentId, revision, set
   useEffect(() => { engine.current?.highlight(); }, [highlightFeatures]);
   useEffect(() => { engine.current?.projection(); }, [projection]);
   useEffect(() => { engine.current?.lens(); }, [focalLengthMm]);
-  useEffect(() => { engine.current?.frame(); }, [output.size]);
+  useEffect(() => { engine.current?.frame(); }, [output.size, frameSize?.width, frameSize?.height]);
   useEffect(() => { host.current?.querySelector('canvas[role="img"]')?.setAttribute('aria-label', 'Studio model. ' + studioNavigationHelp(navigation)); }, [navigation]);
   useEffect(() => { live.current.onShowingImage(overlay?.kind === 'image'); }, [overlay]);
   return <div className="studio-viewport" data-highlighted-features={highlightFeatures?.join(',')} ref={host}>

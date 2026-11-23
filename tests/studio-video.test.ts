@@ -53,7 +53,7 @@ test('holds, cuts, arrival lighting and direct push movements use the same deter
   const c = view({ camera: { ...camera, position: [-10, 0, 5] }, motion: 'cut', presentation: { exposure: 0.5 }, hold: 1 });
   const views = [a, b, c]; assert.equal(videoDuration(views), 4.5);
   assert.deepEqual(videoFrameAt(views, 0.9).camera, a.camera);
-  assert.equal(videoFrameAt(views, 2).presentation.exposure, undefined);
+  assert.equal(videoFrameAt(views, 2).presentation.exposure, 1.5, 'the scene blends from the default exposure while travelling');
   assert.equal(videoFrameAt(views, 3).presentation.exposure, 2);
   assert.deepEqual(videoFrameAt(views, 3.5).camera, c.camera);
   assert.equal(videoFrameAt(views, 999).presentation.exposure, 0.5);
@@ -61,7 +61,8 @@ test('holds, cuts, arrival lighting and direct push movements use the same deter
   assert.throws(() => studioVideoSequenceSchema.parse([a, ...Array.from({ length: 11 }, () => view())]));
   assert.throws(() => studioVideoSequenceSchema.parse([a, a]));
   assert.throws(() => studioVideoSequenceSchema.parse([view()]));
-  assert.throws(() => studioVideoEncodingSchema.parse({ id: randomUUID(), width: 1920, height: 720, fps: 24, frames: 24 }));
+  assert.throws(() => studioVideoEncodingSchema.parse({ id: randomUUID(), width: 1921, height: 1080, fps: 24, frames: 24 }));
+  assert.throws(() => studioVideoEncodingSchema.parse({ id: randomUUID(), width: 1920, height: 1080, fps: 25, frames: 24 }));
 });
 
 test('real FFmpeg encodes ordered PNG frames as a complete 1080p H.264 MP4; cancellation releases its slot', async () => {
@@ -88,4 +89,16 @@ test('real FFmpeg encodes ordered PNG frames as a complete 1080p H.264 MP4; canc
   const missing = new StudioVideoEncoder('/nonexistent/ffmpeg');
   try { await assert.rejects(missing.start({ id: randomUUID(), width: 1280, height: 720, fps: 24, frames: 12 }), /Install FFmpeg/); }
   finally { await missing.close(); }
+});
+
+
+test('encoder budget expiration remains a typed terminal error after its resources are released', async () => {
+  const encoder = new StudioVideoEncoder('ffmpeg', 30), id = randomUUID();
+  try {
+    await encoder.start({id,width:1280,height:720,fps:24,frames:12});
+    await new Promise(resolve=>setTimeout(resolve,100));
+    await assert.rejects(encoder.finish(id),(error:any)=>error.code==='VIDEO_BUDGET_EXCEEDED');
+    assert.equal(encoder.busy,false);
+    await encoder.start({id:randomUUID(),width:1280,height:720,fps:24,frames:12});
+  } finally { await encoder.close(); }
 });

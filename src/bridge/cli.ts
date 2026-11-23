@@ -9,12 +9,12 @@ import { deliver } from './deliver.ts';
 /** What differs from MCP: how arguments, context and binary outputs travel through a shell. */
 const CLI_FLOW = `${APP.title} CLI: the same tools, schemas and results as the MCP server, for shells and scripts.
 
-  npm run -s cad -- doctor [--json]        Diagnose bridge, browser and contract versions
-  npm run -s cad -- help                    This guide, then every tool
-  npm run -s cad -- help <tool> [kind/action] Concise tool help; optional feature kind or documents action
-  npm run -s cad -- tools [--json]          One line per tool, or the full catalog as JSON (what MCP lists)
-  npm run -s cad -- schema <tool> [--kind <kind>]  Compact JSON input schema with shared definitions
-  npm run -s cad -- <tool> [args] [--latest]
+  pnpm --silent run cad doctor [--json]        Diagnose bridge, browser and contract versions
+  pnpm --silent run cad help                    This guide, then every tool
+  pnpm --silent run cad help <tool> [kind/action] Concise tool help; optional feature kind or documents action
+  pnpm --silent run cad tools [--json]          One line per tool, or the full catalog as JSON (what MCP lists)
+  pnpm --silent run cad schema <tool> [--kind <kind>]  Compact JSON input schema with shared definitions
+  pnpm --silent run cad <tool> [args] [--latest]
       args       Inline JSON, @file.json, or - for stdin. Defaults to {}.
       --session  Session UUID from agent_session join/resume. Also VIBEWORKS_AGENT_SESSION.
       --latest   Fill a missing documentId/expectedRevision from inspect_model just before sending.
@@ -23,7 +23,7 @@ const CLI_FLOW = `${APP.title} CLI: the same tools, schemas and results as the M
 Results print as JSON on stdout: a compact receipt, or full detail for inspect_model and errors.
 render_views writes its PNG and export_model its file beneath artifacts/ and print the path;
 open the PNG with your image viewer or tool to look at it. Exit status: 0 success,
-1 command error, 2 usage error. Start the Node authority with npm run headless.`;
+1 command error, 2 usage error. Start the Node authority with pnpm run headless.`;
 
 const isCommandName = isAgentTool;
 const needsContext = (name: CommandName) => ['apply_edits', 'select_features', 'document_action'].includes(name);
@@ -54,7 +54,7 @@ export async function runCli(argv: string[], forward: (command: CadCommand) => P
   if (kindIndex >= 0 && name !== 'schema' && name !== 'help') { print('--kind is only accepted by help/schema.'); return 2; }
   if (name === 'help' || name === '--help') {
     if (input !== undefined) {
-      if (!isCommandName(input)) { console.error(`Unknown tool '${input}'. Run: npm run -s cad -- tools`); return 2; }
+      if (!isCommandName(input)) { console.error(`Unknown tool '${input}'. Run: pnpm --silent run cad tools`); return 2; }
       const detail = extra[0] ?? kind;
       if (extra.length > 1 || detail && input !== 'apply_edits' && input !== 'documents') { print('Only apply_edits feature kinds and documents actions have detail help.'); return 2; }
       if (input === 'apply_edits' && detail && !FEATURE_KINDS.includes(detail as typeof FEATURE_KINDS[number])) { print(`Unknown feature kind '${detail}'. Kinds: ${FEATURE_KINDS.join(', ')}`); return 2; }
@@ -76,11 +76,11 @@ export async function runCli(argv: string[], forward: (command: CadCommand) => P
   }
   if (name === 'tools') { print(json ? JSON.stringify({ app: APP, instructions: AGENT_GUIDE, tools: toolCatalog() }) : tools.map(summary).join('\n')); return 0; }
   if (name === 'schema') {
-    if (!isCommandName(input)) { console.error(`Unknown tool '${input ?? ''}'. Run: npm run -s cad -- tools`); return 2; }
+    if (!isCommandName(input)) { console.error(`Unknown tool '${input ?? ''}'. Run: pnpm --silent run cad tools`); return 2; }
     try { print(JSON.stringify(schemaOf(input, kind))); return 0; }
     catch (error) { print(error instanceof Error ? error.message : String(error)); return 2; }
   }
-  if (!isCommandName(name)) { console.error(`Unknown tool '${name}'. Run: npm run -s cad -- tools`); return 2; }
+  if (!isCommandName(name)) { console.error(`Unknown tool '${name}'. Run: pnpm --silent run cad tools`); return 2; }
 
   let params: unknown;
   try { params = await readParams(input); }
@@ -96,7 +96,7 @@ export async function runCli(argv: string[], forward: (command: CadCommand) => P
   catch (error) {
     const issues = error instanceof z.ZodError ? error.issues : undefined;
     const message=issues?.map(i=>`${i.path.join('.')}: ${i.message}`).join('; ').slice(0,1600)??'Arguments do not match the schema.';
-    const failure:Record<string,unknown>={operation:name,status:'error',error:{code:'INVALID_COMMAND',message:`${message}${needsContext(name)&&issues?.some(i=>i.path[0]==='documentId'||i.path[0]==='expectedRevision')?' Pass documentId/expectedRevision or use --latest.':''} See: npm run -s cad -- help ${name}`,details:issues}};
+    const failure:Record<string,unknown>={operation:name,status:'error',error:{code:'INVALID_COMMAND',message:`${message}${needsContext(name)&&issues?.some(i=>i.path[0]==='documentId'||i.path[0]==='expectedRevision')?' Pass documentId/expectedRevision or use --latest.':''} See: pnpm --silent run cad help ${name}`,details:issues}};
     if(forward===forwardCommand)try{const p=params as any;const tracked=await recordRejectedAttempt({operation:name,sessionId:p?.sessionId,documentId:z.string().uuid().safeParse(p?.documentId).success?p.documentId:undefined,code:'INVALID_COMMAND',message,fields:issues?.map(i=>i.path.join('.'))??[]});if(tracked)Object.assign(failure,tracked);}catch{/* Preserve the input error if tracking is offline. */}
     print(JSON.stringify(failure,null,2));
     return 2;

@@ -13,12 +13,13 @@ test('video camera selection restores its camera and scene on ready, removal, un
       camera:{position:[[100,100,70],[100,-100,70],[-100,-100,70]][i],target:[0,0,0],fov:35,focalLengthMm:50},
       presentation:{environmentPreset:'dark_studio',floor:'none',background:['#aa3333','#33aa33','#3333aa'][i]},motion:'move',seconds:1,hold:.5}));
     localStorage.setItem('vibeworks.studio.video.selection-fixture',JSON.stringify(views));window.originalViews=views;
-    const evaluation={meshes:[],geometry:[],visibleFeatureIds:[]},settings={background:'#888888'},output={size:'hd',quality:'draft',denoise:true};
+    const evaluation={meshes:[],geometry:[],visibleFeatureIds:[]},settings={background:'#888888'};
     function Harness(){const[ready,setReady]=useState(false),[key,setKey]=useState(0),[interaction,setInteraction]=useState(0);
       const api=useRef({captureVideo:()=>window.camera,previewVideo:camera=>{window.camera=structuredClone(camera);window.cameraCalls=(window.cameraCalls??0)+1}});
       useEffect(()=>{window.readyVideo=()=>setReady(true);window.manualCamera=camera=>{window.camera=camera;setInteraction(n=>n+1)};window.remountVideo=()=>setKey(n=>n+1)},[]);
-      return <StudioVideoPanel key={key} documentId="selection-fixture" revision={0} name="Fixture" evaluation={evaluation} settings={settings} output={output} api={api} ready={ready} perspective interaction={interaction}
-        onScene={scene=>window.scene=scene} onBusy={()=>{}} onProcess={()=>{}}/>;
+      return <StudioVideoPanel key={key} documentId="selection-fixture" revision={0} name="Fixture" evaluation={evaluation} settings={settings} api={api} ready={ready} perspective interaction={interaction}
+        execute={async command=>command.params.action==='cancel'?{status:'success',videoJob:{state:'cancelled'}}:{status:'error',error:{code:'RENDER_TIMEOUT',message:'Video exceeded its render budget.'}}}
+        onScene={scene=>window.scene=scene} onBusy={()=>{}} onProcess={()=>{}} onSave={async()=>undefined} onFrame={()=>{}}/>;
     }createRoot(document.getElementById('root')).render(<Harness/>);
   ` }, bundle: true, write: false, format: 'iife', platform: 'browser', jsx: 'automatic', outfile: 'fixture.js', loader: { '.css': 'empty', '.tza': 'dataurl' }, define: { __VIBEWORKS_FINGERPRINT__: '"selection-fixture"' } });
   const browser = await chromium.launch({ headless: true, args: process.platform === 'darwin' ? ['--use-angle=metal'] : [] });
@@ -56,6 +57,15 @@ test('video camera selection restores its camera and scene on ready, removal, un
     await assertSelected(1);
     await page.evaluate(() => (window as any).remountVideo());
     await assertSelected(0);
+    await page.locator('.studio-video-export-summary').click();
+    assert.equal(await page.getByRole('button',{name:'Realistic',exact:true}).isDisabled(),true);
+    assert.equal(await page.getByRole('button',{name:'Fast',exact:true}).getAttribute('aria-pressed'),'true');
+    await page.getByText('Realistic video is unavailable until renders can resume after interruption.',{exact:false}).waitFor();
+    await page.locator('.studio-video-export-summary').click();
+    await page.getByRole('button',{name:'Render video',exact:true}).click();
+    await page.waitForFunction(()=>document.querySelector('.studio-video-panel')?.getAttribute('data-video-state')==='error');
+    assert.equal(await page.locator('.studio-video-panel').getAttribute('data-error-code'),'RENDER_TIMEOUT');
+    assert.equal(await page.getByRole('button',{name:'Render video',exact:true}).isEnabled(),true);
     assert.deepEqual(errors, []);
   } finally { await browser.close(); }
 });

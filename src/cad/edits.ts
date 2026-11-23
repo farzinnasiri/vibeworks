@@ -130,6 +130,9 @@ export function applyEdits(source: CadDocument, edits: Edit[], inherited?:Map<st
       } else if (edit.op === 'set_presentation') {
         if (edit.presentation === null) delete document.presentation;
         else document.presentation = edit.presentation;
+      } else if (edit.op === 'set_video') {
+        if (edit.video === null) delete document.video;
+        else document.video = edit.video;
       } else if (edit.op === 'set_parameter') {
         const { op: _op, ...parameter } = edit;
         const parameters = document.parameters ?? [];

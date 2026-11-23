@@ -38,7 +38,7 @@ export function createMcpServer(forward: (command: CadCommand) => Promise<CadRes
     const readOnly = commandInfo[name].effect === 'read';
     server.registerTool(name, {
       description: commandInfo[name].description, inputSchema: toolInput(name),
-      annotations: { readOnlyHint: readOnly, destructiveHint: !readOnly, idempotentHint: readOnly && name !== 'export_model' && name !== 'render_image', openWorldHint: false },
+      annotations: { readOnlyHint: readOnly, destructiveHint: !readOnly, idempotentHint: readOnly && name !== 'export_model' && name !== 'render_image' && name !== 'render_video', openWorldHint: false },
     }, async (params) => {
       const started = performance.now();
       const measured = (reply:CallToolResult) => { logMcpCall(name,params,reply,started); return reply; };

@@ -1,7 +1,7 @@
 import {Select} from './Select';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { RuntimeClient, RuntimeState } from '../cad/runtime';
-import type { CadDocument, MaterialLook, Presentation, ViewName, WorkspaceViewState } from '../shared/protocol';
+import type { CadDocument, MaterialLook, Presentation, StudioVideoRecipe, ViewName, WorkspaceViewState } from '../shared/protocol';
 import { FINISHES, materialById, NEUTRAL_COLOR, SURFACE_DETAILS } from '../shared/materials';
 import {
   COAT_LABELS, DEFAULT_IMAGE_OUTPUT, DETAIL_LABELS, IMAGE_QUALITIES, IMAGE_SIZES, imagePixels, imageQuality,
@@ -29,12 +29,12 @@ import { StudioGallery } from './StudioGallery';
 import { readSceneDraft, readStudioPreferences, writeSceneDraft, writeStudioPreferences, type StudioPreferences } from './studio-looks';
 
 const OUTPUT_KEY = 'vibeworks.studio.output';
-function readOutput(key = OUTPUT_KEY, fallback = DEFAULT_IMAGE_OUTPUT): ImageOutput {
+function readOutput(): ImageOutput {
   try {
-    const saved = JSON.parse(localStorage.getItem(key) ?? 'null');
+    const saved = JSON.parse(localStorage.getItem(OUTPUT_KEY) ?? 'null');
     if (saved && saved.size in IMAGE_SIZES && saved.quality in IMAGE_QUALITIES) return { size: saved.size, quality: saved.quality, denoise: saved.denoise !== false };
   } catch { /* fall back to defaults */ }
-  return fallback;
+  return DEFAULT_IMAGE_OUTPUT;
 }
 
 type Panel = StudioPreferences['panel'];
@@ -114,6 +114,7 @@ function ImageViewer({ children, onClose }: { children: ReactNode; onClose: () =
 
 export function StudioWorkspace({ runtime, state, disabled, prepared, onPrepared,onNavigationRisk }: { runtime: RuntimeClient; state: RuntimeState; disabled: boolean; prepared?:WorkspaceViewState; onPrepared?:(error?:string)=>void;onNavigationRisk?:(risk:{draft:boolean;rendering:boolean})=>void }) {
   const document = state.document;
+  const [videoSelection, setVideoSelection] = useState<string[]>(document.selectedFeatureIds);
   const remembered = useMemo(() => prepared ? {} : readStudioPreferences(), [prepared]);
   // Unsaved scene edits stay in this browser between visits; agent-prepared scenes never read or write them.
   const [draft, setDraft] = useState<Presentation|undefined>(() => prepared?.presentation ?? readSceneDraft(document.documentId));
@@ -130,7 +131,6 @@ export function StudioWorkspace({ runtime, state, disabled, prepared, onPrepared
   const [pointed, setPointed] = useState<string>();
   const [flash, setFlash] = useState<string>();
   const [output, setOutputState] = useState<ImageOutput>(()=>prepared?.studio?.output??readOutput());
-  const [videoOutput, setVideoOutputState] = useState<ImageOutput>(() => readOutput('vibeworks.studio.video-output', { ...DEFAULT_IMAGE_OUTPUT, quality: 'draft' }));
   const [preview, setPreview] = useState<PreviewState>({ phase: 'loading' });
   const [job, setJob] = useState<JobState>({ phase: 'idle' });
   const [jobSettings, setJobSettings] = useState('');
@@ -150,6 +150,7 @@ export function StudioWorkspace({ runtime, state, disabled, prepared, onPrepared
   const galleryNotice = useGalleryNotice();
   const [mode, setMode] = useState<'image' | 'video'>('image');
   const [videoScene, setVideoScene] = useState<Presentation>();
+  const [videoFrame, setVideoFrame] = useState<{ width: number; height: number }>();
   const [videoBusy, setVideoBusy] = useState(false);
   const [videoProcess, setVideoProcess] = useState<VideoProcess>();
   const [videoInteraction, setVideoInteraction] = useState(0);
@@ -232,9 +233,9 @@ export function StudioWorkspace({ runtime, state, disabled, prepared, onPrepared
     change({ materials: Object.keys(materials).length ? materials : undefined, carbonFinish: undefined });
   };
   const setOutput = (patch: Partial<ImageOutput>) => {
-    const next = { ...(mode === 'video' ? videoOutput : output), ...patch };
-    if (mode === 'video') setVideoOutputState(next); else setOutputState(next);
-    try { localStorage.setItem(mode === 'video' ? 'vibeworks.studio.video-output' : OUTPUT_KEY, JSON.stringify(next)); } catch { /* preference only */ }
+    const next = { ...output, ...patch };
+    setOutputState(next);
+    try { localStorage.setItem(OUTPUT_KEY, JSON.stringify(next)); } catch { /* preference only */ }
   };
   const revert = () => { setVideoScene(undefined); setDraft(undefined); setBase(undefined); setError(''); restoredDraft.current = false; };
   const save = async () => {
@@ -247,17 +248,22 @@ export function StudioWorkspace({ runtime, state, disabled, prepared, onPrepared
       else { setDraft(undefined); setBase(undefined); restoredDraft.current = false; }
     } catch (error) { setError(String(error)); } finally { setSaving(false); }
   };
+  const saveVideo = async (video: StudioVideoRecipe) => {
+    try {
+      const result = await track('apply_edits', () => runtime.execute({ type: 'apply_edits', params: { ...context(document), edits: [{ op: 'set_video', video }] } }));
+      return result.status === 'error' ? result.error!.message : undefined;
+    } catch (error) { return String(error); }
+  };
   const startRender = () => { setJobSettings(JSON.stringify(settings)); setViewing(undefined); api.current?.render({ rendering: imageRendering, layout: imageLayout, labels: imageLabels, ...(imageScope === 'views' ? { views: imageViews } : {}) }); };
   const openPanel = (next: Panel) => { setPanel(next); if (next !== 'materials') setPointed(undefined); };
   const pointMaterial = useCallback((key: string, pointing: boolean) => setPointed(current => pointing ? key : current === key ? undefined : current), []);
   const pixels = imagePixels(output, viewport, window.devicePixelRatio);
-  const renderOutput = mode === 'video' ? videoOutput : output;
-  const quality = imageQuality(renderOutput);
+  const quality = imageQuality(output);
   const customLooks = Object.keys(s.materials).length;
   const editing = disabled || saving;
   const composingViews = mode === 'image' && imageScope === 'views' && panel === 'output' && !showingImage;
   const highlighted = panel === 'materials' && !running && !showingImage ? pointed ?? flash : undefined;
-  const panels = PANELS;
+  const panels = mode === 'image' ? PANELS : PANELS.filter(tab => tab.id !== 'output');
   const sceneStatus = videoScene ? 'Scene from the selected camera view' : draft ? (restoredDraft.current ? 'Unsaved scene from your last visit' : 'Unsaved changes · kept in this browser') : 'Same as the scene saved with the model';
 
   const process: StudioProcessState = (() => {
@@ -275,7 +281,7 @@ export function StudioWorkspace({ runtime, state, disabled, prepared, onPrepared
       detail: video.phase === 'encoding' ? `${video.total} frames rendered · finishing MP4` : `Frame ${Math.min(video.frames + 1, video.total)} / ${video.total}${video.target ? ` · ${video.samples} / ${video.target} samples` : ''}`,
       value: video.phase === 'rendering' ? video.frames / video.total : undefined, elapsedMs: video.elapsedMs,
       etaMs: video.phase === 'rendering' ? video.etaMs : undefined, cancel: videoProcess?.cancel };
-    if (mode === 'video' && videoProcess?.error) return { kind: 'video', phase: videoProcess.error === 'Video cancelled.' ? 'idle' : 'error', title: videoProcess.error === 'Video cancelled.' ? 'Video cancelled' : 'Video stopped', detail: videoProcess.error };
+    if (mode === 'video' && videoProcess?.error) return { kind: 'video', phase: videoProcess.errorCode === 'VIDEO_CANCELLED' ? 'idle' : 'error', title: videoProcess.errorCode === 'VIDEO_CANCELLED' ? 'Video cancelled' : 'Video stopped', detail: videoProcess.error,errorCode:videoProcess.errorCode };
     if (mode === 'image' && job.phase === 'error') return { kind: 'image', phase: 'error', title: 'Image stopped', detail: job.message };
     if (preview.phase === 'loading') return { kind: 'preview', phase: 'preparing', title: 'Preparing Studio', detail: `Loading model, graphics and lighting · ${document.name ?? 'Model'}` };
     if (preview.phase === 'error') return { kind: 'preview', phase: 'error', title: 'Preview unavailable', detail: preview.message ?? 'Exit Studio and reopen it to retry.' };
@@ -319,15 +325,15 @@ export function StudioWorkspace({ runtime, state, disabled, prepared, onPrepared
       onPointerDownCapture={event => { if (event.target instanceof Element && event.target.closest('.studio-image-lock')) setNudge(n => n + 1); }}>
       <StudioProcess state={process} thumbnail={thumb} />
       <StudioViewport identity={identity}
-        evaluation={state.evaluation} documentId={document.documentId} revision={document.revision} settings={settings} output={mode === 'video' ? { ...videoOutput, size: 'hd' } : output} projection={projection} focalLengthMm={focalLengthMm} navigation={navigation} api={api}
+        evaluation={state.evaluation} documentId={document.documentId} revision={document.revision} settings={settings} output={output} frameSize={mode === 'video' ? videoFrame : undefined} projection={projection} focalLengthMm={focalLengthMm} navigation={navigation} api={api}
         rememberCamera={!prepared} onCameraAzimuth={setCameraAzimuth}
         onPreview={next=>{setPreview(next);if(prepared&&!preparedApplied.current){
           if(next.phase==='error'){preparedApplied.current=true;onPrepared?.(next.message??'Studio preview failed.');}
           else if(next.phase==='ready'&&api.current){preparedApplied.current=true;try{api.current.present(prepared.panes[0],state.evaluation);onPrepared?.();}catch(e){onPrepared?.(e instanceof Error?e.message:String(e));}}
         }}} onJob={setJob} onRendered={async render => { const saved: StudioRender = { ...render, documentName: document.name ?? undefined, id: crypto.randomUUID(), url: URL.createObjectURL(render.blob), ...(render.thumbnail ? { thumbnailUrl: URL.createObjectURL(render.thumbnail) } : {}) }; await addRender(saved); setDisplayedId(saved.id); return saved; }}
         onInteraction={() => { setViewing(undefined); setVideoInteraction(n => n + 1); }} onProjection={setProjection} onLens={setFocalLengthMm} onShowingImage={setShowingImage} progressThumb={thumb}
-        highlightFeatures={highlighted ? groups.find(g => g.key === highlighted)?.featureIds : undefined}
-        onPickFeature={featureId => { const group = groups.find(g => g.featureIds.includes(featureId)); if (group) { setPanel('materials'); setMaterialOpen(group.key); setFlash(group.key); setSettingsOpen(true); } }} />
+        highlightFeatures={mode === 'video' ? videoSelection : highlighted ? groups.find(g => g.key === highlighted)?.featureIds : undefined}
+        onPickFeature={featureId => { if (mode === 'video') { setVideoSelection([featureId]); return; } const group = groups.find(g => g.featureIds.includes(featureId)); if (group) { setPanel('materials'); setMaterialOpen(group.key); setFlash(group.key); setSettingsOpen(true); } }} />
       {composingViews && !running && <StudioImagePreview evaluation={state.evaluation} settings={settings} views={imageViews} layout={imageLayout} labels={imageLabels} aspect={pixels.width / pixels.height} width={pixels.width} height={pixels.height} projection={projection} fov={studioLensFov(focalLengthMm, viewport, pixels)} />}
       {showingImage && displayed && <div key={nudge} className={`studio-result-bar ${nudge ? 'nudged' : ''}`} role="region" aria-label="Finished image">
         <span><strong>Finished image</strong> · {displayed.width} × {displayed.height} · {displayed.quality} · in your gallery</span>
@@ -335,8 +341,9 @@ export function StudioWorkspace({ runtime, state, disabled, prepared, onPrepared
         <button type="button" className="primary-button" onClick={() => api.current?.resumePreview()}><Icon name="camera" size={16} />Back to preview</button>
       </div>}
       {mode === 'video' && <StudioVideoPanel key={document.documentId} documentId={document.documentId} revision={document.revision} name={document.name ?? 'vibeworks'}
-        evaluation={state.evaluation} settings={settings} output={videoOutput} api={api} ready={preview.phase === 'ready' && !disabled} perspective={projection === 'perspective'} interaction={videoInteraction}
-        onScene={setVideoScene} onBusy={setVideoBusy} onProcess={setVideoProcess} />}
+        evaluation={state.evaluation} settings={settings} api={api} ready={preview.phase === 'ready' && !disabled} perspective={projection === 'perspective'} interaction={videoInteraction}
+        onScene={setVideoScene} onBusy={setVideoBusy} onProcess={setVideoProcess} saved={document.video} onSave={saveVideo} onFrame={setVideoFrame} selection={videoSelection}
+        execute={command=>runtime.execute(command)} inspectDisplay={runtime.inspectDisplay?.bind(runtime)} />}
       {mode === 'image' && <div className="studio-render-bar" role="region" aria-label="Rendered images">
         {renders.length > 0 && <ol className="studio-renders" aria-label="Finished images">
           {renders.slice(0, 12).map((render, i) => <li key={render.id}><button type="button" className={viewing === render.id ? 'active' : ''} title={render.label} aria-label={`Open image ${renders.length - i}: ${render.width} × ${render.height}, ${render.quality}`} onClick={() => setViewing(render.id)}>
@@ -388,10 +395,10 @@ export function StudioWorkspace({ runtime, state, disabled, prepared, onPrepared
           {mode === 'image' && <StudioImageOptions evaluation={state.evaluation} scope={imageScope} onScope={scope => { api.current?.resumePreview(); setImageScope(scope); }} views={imageViews} onViews={views => { api.current?.resumePreview(); setImageViews(views); }} layout={imageLayout} onLayout={layout => { api.current?.resumePreview(); setImageLayout(layout); }} labels={imageLabels} onLabels={labels => { api.current?.resumePreview(); setImageLabels(labels); }} rendering={imageRendering} onRendering={setImageRendering} disabled={running} />}
           {mode === 'image' && <><Segmented label="Size" value={output.size} onChange={size => { api.current?.resumePreview(); setOutput({size}); }} options={Object.entries(IMAGE_SIZES).map(([id,size]) => ({id:id as ImageOutput['size'],label:size.label}))} />
             <p className="studio-note">{pixels.width} × {pixels.height} px. The frame on the preview shows the crop.</p></>}
-          {(mode === 'video' || imageRendering === 'quality') && <><Segmented label={mode === 'video' ? 'Path traced frame quality' : 'Quality'} value={renderOutput.quality} onChange={q => setOutput({ quality: q })}
-            options={Object.entries(IMAGE_QUALITIES).map(([id, q]) => ({ id: id as ImageOutput['quality'], label: q.label, title: `${renderOutput.denoise ? q.samples : q.rawSamples} samples` }))} />
-            <label className="studio-check"><input type="checkbox" checked={renderOutput.denoise} onChange={e => setOutput({ denoise: e.target.checked })} /> Reduce noise when finished</label>
-            <p className="studio-note">{quality.samples} samples{mode === 'video' ? ' per frame, for Path traced video only' : ', path traced with WebGPU'}.</p></>}
+          {mode === 'image' && imageRendering === 'quality' && <><Segmented label="Quality" value={output.quality} onChange={q => setOutput({ quality: q })}
+            options={Object.entries(IMAGE_QUALITIES).map(([id, q]) => ({ id: id as ImageOutput['quality'], label: q.label, title: `${output.denoise ? q.samples : q.rawSamples} samples` }))} />
+            <label className="studio-check"><input type="checkbox" checked={output.denoise} onChange={e => setOutput({ denoise: e.target.checked })} /> Reduce noise when finished</label>
+            <p className="studio-note">{quality.samples} samples, path traced with WebGPU.</p></>}
         </div>}
         {stale && <p className="notice error" role="alert">The model changed while you adjusted this scene. Revert to the saved scene before saving again.</p>}
         {error && <p className="notice error" role="alert">{error}</p>}

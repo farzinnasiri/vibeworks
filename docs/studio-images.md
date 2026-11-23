@@ -149,7 +149,7 @@ Cancellation closes the active image's managed browser; the next image gets a fr
 CLI syntax is the same command and JSON, for example:
 
 ```sh
-npm run -s cad -- render_image '{"action":"status","jobId":"<UUID>"}' --session <agent-session-UUID>
+pnpm --silent run cad render_image '{"action":"status","jobId":"<UUID>"}' --session <agent-session-UUID>
 ```
 
 Omit presentation to use the document's saved scene. Supplied fields override the saved top-level fields

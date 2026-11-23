@@ -1,0 +1,5 @@
+# Each package root installs independently and shares pnpm's content-addressable store.
+packages: []
+allowBuilds:
+  "esbuild": true
+  "fsevents": false
